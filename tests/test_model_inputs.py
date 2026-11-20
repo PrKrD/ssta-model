@@ -17,10 +17,10 @@ from ssta_model.data.model_inputs import (
     year_round_coefficients,
 )
 from ssta_model.data.prepare import (
-    coverage,
     forcing_audit,
     organize_raw,
     source_paths,
+    spatial_damping_coverage,
     write_product,
 )
 
@@ -276,14 +276,17 @@ def test_independent_coverage_and_intersections_preserve_sign_policy(
         {"ocean": (("latitude", "longitude"), np.ones((5, 4)))},
         coords={name: selected[name] for name in ("latitude", "longitude")},
     )
-    result = coverage(selected, regression, mask)
+    result = spatial_damping_coverage(selected, regression, mask)
     assert result["damping_nonpositive_ocean"] == 1
     assert result["damping_missing_ocean"] == 1
     assert result["available_intersection"] == 19
     assert result["reliable_intersection"] == 18
     assert result["positive_reliable_intersection"] == 17
-    assert selected.input_valid.values[0, 0] == 1  # Negative remains available.
-    assert selected.input_valid.values[1, 0] == 0  # Missing never becomes zero gamma.
+    assert (
+        "input_valid" not in selected
+    )  # Legacy diagnostics cannot set runtime policy.
+    assert selected.gamma.values[0, 0] == -5
+    assert np.isnan(selected.gamma.values[1, 0])
 
 
 def test_compression_roundtrip_preserves_physical_precision_and_missing_flags(

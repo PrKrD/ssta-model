@@ -78,6 +78,10 @@ local NetCDF files and generate compact, validated inputs under
 `data/raw/`; both local directories are Git-ignored. See the
 [data guide](data/README.md) for exact selections, mask-aware depth mapping,
 provisional damping, compression, and generated inventory/coverage reports.
+The first-model baseline now uses one provisional area-weighted effective damping
+coefficient in [configuration](configs/surface_damping.toml). Runtime spatial
+products contain H and its validity information; local damping gaps do not limit
+the active domain. No numerical integration is implemented yet.
 
 ## Frontend
 

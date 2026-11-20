@@ -27,7 +27,11 @@ Sea surface salinity remains an optional extension.
   selections and mask-aware depth mapping; [prepare.py](../src/ssta_model/data/prepare.py)
   owns local file organization, lossless output checks and reporting. The
   [entry script](../experiments/prepare_model_inputs.py) is a thin caller. Runtime
-  integration will consume prepared fields rather than raw diagnostic datasets.
+  integration will consume prepared PC/beta/H/mask products and a scalar damping
+  configuration rather than raw diagnostic datasets. The provisional uniform
+  coefficient is estimated outside integration by spherical-area weighting of
+  reliable positive extratropical gamma; its value lives in
+  [configuration](../configs/surface_damping.toml), not scientific functions.
 - [analysis](../src/ssta_model/analysis/) will diagnose outputs, validate models
   and perform statistical analysis, including parameter estimation when needed.
 - [experiments](../experiments/) will connect preparation, configuration,
@@ -61,6 +65,12 @@ is a separate calculation. Do not repeatedly fit parameters or read raw
 observations inside timestepping. No parameter values or dataset choices are
 invented by the software; current supplied-input choices are documented in the
 [data guide](../data/README.md). No parameters are refitted during preparation.
+The effective global damping is an aggregation of supplied spatial estimates,
+not a new feedback fit. Its calibration support differs from the runtime mask:
+the latter requires ERA5 ocean, an extratropical centre, positive finite H and
+12 finite beta values, with no local damping/open-water/reliability gate. No
+additional sea-ice mask is used for this baseline. Raw forcing regressions and
+possible overlap with explicit damping are not independently corrected.
 
 To add a process, document its assumptions and inputs, implement its calculation
 in the relevant package, test it in isolation, then connect it explicitly to the

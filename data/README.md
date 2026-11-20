@@ -19,7 +19,9 @@ ruff check .
 ruff format --check .
 ```
 
-`--data-dir PATH` selects another local input directory. Initially place the exact
+`--data-dir PATH` selects another local input directory;
+`--damping-config PATH` selects the generated baseline TOML destination (default
+`configs/surface_damping.toml`). Initially place the exact
 seven named files below directly here, or in `raw/`. Ambiguous duplicate names
 are rejected. Reruns recognize already-organized originals and replace only the
 pipeline's own products. Writers verify exact decoded-value/missing-mask round
@@ -44,13 +46,14 @@ library versions, NetCDF/HDF5 versions and preparation-source hashes.
 | `SH heat-flux regression.nc` | `south_regression.nc`: southern coefficients, latitude ≤−20° |
 | `ERA5 land–sea mask.nc` | `era5_ocean_mask.nc`: first native fractional mask and ocean classification |
 | `Mixed-layer depth.nc` | Fixed H and source coverage in both `*_surface.nc` products |
-| `SST damping.nc` | Selected gamma and original quality flags in both `*_surface.nc` products |
+| `SST damping.nc` | Scalar in `configs/surface_damping.toml`; calibration statistics/provenance in the manifest, no runtime spatial gamma |
 
 The inventory in the manifest includes **all original variables**, dimensions,
 coordinate bounds/order, attributes, sizes and checksums. Product entries record
 source hashes, exact selections, compression, dtype policy and round-trip checks.
 The report gives individual file sizes, compression savings, independent component
-coverage and available/reliable/positive-reliable intersections. Reported NetCDF
+coverage before/after the uniform-damping change, sampled ocean areas, and scalar
+calibration statistics. Reported NetCDF
 savings refer to the compact **working dataset**, excluding the small JSON/Markdown
 audit files. Originals remain retained: no original disk space is freed.
 
@@ -82,17 +85,59 @@ audit files. Originals remain retained: no original disk space is freed.
   classification, and minimum/total monthly profile counts (`n_obs`). These are
   coverage diagnostics; zero observations are not used to erase valid mapped
   climatological estimates. Monthly source detail remains in the raw file.
-- Damping selects labelled **primary**, **lag 1** (SST leads flux), **turbulent**,
-  in W m⁻² K⁻¹. Gamma remains provisional, signed and unfilled. Original ocean,
-  open-water, reliability, negative, large, lag-sensitive and related flags are
-  preserved. These flags aggregate source targets/lags; they must not be
-  mistaken for flags computed solely from the selected gamma.
-- `input_valid` denotes the intersection of ERA5 ocean, positive finite H,
-  all 12 finite coefficients, finite gamma and source open-water support.
-  Reliability and positivity are **separate** policies, with separate counts;
-  no negative damping is silently removed from the physical data.
+- Damping calibration selects labelled **primary**, **lag 1** (SST leads flux),
+  **turbulent**, in W m⁻² K⁻¹. It uses only finite, strictly positive gamma with
+  source `reliable == 1` in ERA5 ocean at centre latitudes ≥20°N or ≤−20°S. The
+  estimate pools both hemispheres by sampled area; hemisphere means are not
+  averaged equally. H, beta and additional sea-ice criteria do not select the
+  calibration sample. The initial migration verified these values against both
+  previous processed damping fields; subsequent runs reproduce them from raw.
+- `input_valid` now denotes **ERA5 ocean ∩ extratropics ∩ finite positive H ∩
+  all 12 finite beta**. It does not depend on local gamma, reliability, open-water
+  coverage or sea ice. Source sea-ice-covered ocean is included if H/beta are
+  valid. Runtime `*_surface.nc` files retain H, its coverage/donor fields and
+  `input_valid` only; no gamma or damping-specific quality flags are present.
+  The full original spatial damping and quality diagnostics remain unchanged
+  under `raw/` for later calibration/sensitivity experiments.
 
-All scientific floats retain their original dtype (coefficients/PCs/gamma float64,
+## Uniform damping and geographical areas
+
+The [baseline configuration](../configs/surface_damping.toml) contains one
+provisional globally uniform effective coefficient under `[surface_damping]`.
+Its numeric value is computed from the inputs, not embedded in processing or
+future integration functions. See [configuration guidance](../configs/README.md)
+for regeneration and future sensitivity overrides.
+
+Areas use the exact spherical formula
+`A = R² Δlongitude × |sin(north_bound) − sin(south_bound)|`, with angles in radians.
+Bounds are adjacent-centre midpoints. Latitude edges are clipped at the poles;
+longitude neighbours wrap periodically. Compute areas on the full native grid
+before selecting hemispheres. The inclusive ±20° rule selects cell centres and
+keeps the full footprint of each selected boundary cell. Ocean areas mean the
+full areas of cells classified by `lsm < 0.5`, not fractional coastal weights.
+
+The area-reporting convention uses the **6,371,229 m ECMWF/IFS sphere** described
+in [ECMWF's spatial-reference documentation](https://confluence.ecmwf.int/pages/viewpage.action?pageId=78296363).
+The supplied NetCDF does not declare its radius, so this is an explicit convention,
+not an inferred GRIB format. The common radius cancels from the weighted mean
+and area fractions; it sets the reported absolute square metres.
+
+The manifest records source damping SHA-256, case/lag/target, exact selection,
+area method/radius, code revision/source hashes, pooled and hemispheric means,
+sample counts/areas, coverage fractions, and unweighted medians/percentiles.
+The calibration sample is independent of the simulation mask. Global unweighted
+statistics pool selected cells, rather than pooling hemisphere summaries.
+
+This uniform coefficient simplifies spatially incomplete, reliability-filtered
+extratropical estimates and applies them to a wider active ocean domain. It is
+**not a uniquely correct or fully validated physical feedback constant**. It may
+need calibration or sensitivity analysis. Raw turbulent regressions remain the
+prescribed forcing: any overlap between their SST-dependent feedback and explicit
+damping is **not independently corrected here**. There is no additional sea-ice
+mask, and using this baseline over sea-ice-covered ocean is a limitation. H remains
+the maximum-monthly-climatology approximation described above.
+
+All runtime scientific floats retain their original dtype (coefficients/PCs float64,
 source-derived H float32). No float64→float32 conversion or rounding is used.
 Compression is lossless NetCDF4 zlib level 4 with shuffle. Binary 0/1/NaN flags
 use reversible int8 storage with an explicit missing sentinel. Chunks suit
@@ -101,10 +146,11 @@ spatial tiles and monthly PC blocks; no global time-by-space forcing cube is sav
 ## Future consumption
 
 The future scientific core can independently load a hemisphere's PC, coefficient
-and surface files with xarray, assert exact time/mode/grid compatibility, and
-choose an explicit validity policy using the retained flags. Preparation and
+and H-only surface files with xarray, assert exact time/mode/grid compatibility,
+read the scalar damping configuration and use the documented `input_valid` mask.
+Local spatial gamma is not a simulation input. Preparation and
 parameter selection happen outside numerical integration. The current pipeline
-does not integrate heat budgets, generate stochastic forcing, recalibrate
+does not integrate heat budgets, generate stochastic forcing, refit spatial
 damping or communicate with the frontend.
 
 Implementation is in [ssta_model.data](../src/ssta_model/data/), with a thin

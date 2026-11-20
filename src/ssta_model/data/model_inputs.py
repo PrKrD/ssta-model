@@ -7,6 +7,9 @@ import xarray as xr
 
 SPATIAL = ("latitude", "longitude")
 MODES = np.arange(1, 13)
+# Explicit area-reporting convention; the supplied NetCDF does not state a radius.
+# https://confluence.ecmwf.int/pages/viewpage.action?pageId=78296363
+EARTH_RADIUS_M = 6_371_229.0
 QUALITY_FLAGS = (
     "original_ocean",
     "open_water",
@@ -346,4 +349,166 @@ def selected_damping(source):
         )
         index = np.flatnonzero(source.case.values == selection["case"])[0]
         output.attrs["parameter_sample_count"] = int(counts[index])
+    return output
+
+
+def spherical_cell_areas(grid, radius_m=EARTH_RADIUS_M):
+    """Exact spherical rectangular areas from centres, including periodic/polar cells.
+
+    Cell bounds are adjacent-centre midpoints, with extrapolated outer latitude
+    edges clipped at ±90°. Selection uses cell centres: the ±20° boundary cells
+    retain their complete native footprint. Compute on the full grid before crops.
+    """
+    require(np.isfinite(radius_m) and radius_m > 0, "Sphere radius must be positive")
+    latitude = np.asarray(grid.latitude.values, dtype=float)
+    longitude = np.asarray(grid.longitude.values, dtype=float)
+    require(
+        latitude.ndim == longitude.ndim == 1
+        and min(latitude.size, longitude.size) >= 2,
+        "Area calculation requires one-dimensional latitude/longitude centres",
+    )
+    require(
+        np.isfinite(latitude).all() and np.all(abs(latitude) <= 90), "Invalid latitudes"
+    )
+    require(
+        np.isfinite(longitude).all()
+        and np.all(np.diff(longitude) > 0)
+        and longitude[-1] - longitude[0] < 360,
+        "Longitude must increase without duplicate seam endpoints",
+    )
+    differences = np.diff(latitude)
+    require(
+        np.all(differences > 0) or np.all(differences < 0),
+        "Latitude must be strictly monotonic",
+    )
+    edges = np.clip(
+        np.r_[
+            latitude[0] - differences[0] / 2,
+            (latitude[:-1] + latitude[1:]) / 2,
+            latitude[-1] + differences[-1] / 2,
+        ],
+        -90,
+        90,
+    )
+    longitude_gaps = np.diff(np.r_[longitude, longitude[0] + 360])
+    widths = (longitude_gaps + np.roll(longitude_gaps, 1)) / 2
+    strips = abs(np.diff(np.sin(np.deg2rad(edges))))
+    values = radius_m**2 * strips[:, None] * np.deg2rad(widths)[None, :]
+    require(np.isfinite(values).all() and np.all(values > 0), "Invalid cell areas")
+    return xr.DataArray(
+        values,
+        dims=SPATIAL,
+        coords={name: grid[name] for name in SPATIAL},
+        name="cell_area",
+        attrs={
+            "units": "m2",
+            "sphere_radius_m": radius_m,
+            "method": "R² × longitude width (radians) × |sin(north)-sin(south)|; midpoint bounds; periodic longitude; polar clipping",
+        },
+    )
+
+
+def constant_damping_statistics(hemispheres, ocean, radius_m=EARTH_RADIUS_M):
+    """Pool reliable positive extratropical samples by area, without H/beta filters."""
+    require(set(hemispheres) == {"north", "south"}, "Both hemispheres are required")
+    areas = spherical_cell_areas(ocean, radius_m)
+    summaries = {}
+    all_values, all_weights = [], []
+
+    def summarize(values, weights, eligible_area, eligible_cells):
+        require(values.size > 0, "No reliable positive damping samples")
+        area = float(weights.sum())
+        percentiles = [1, 5, 25, 50, 75, 95, 99]
+        return {
+            "units": "W m-2 K-1",
+            "area_weighted_mean": float(np.sum(values * weights) / area),
+            "unweighted_mean": float(values.mean()),
+            "unweighted_median": float(np.median(values)),
+            "minimum": float(values.min()),
+            "maximum": float(values.max()),
+            "unweighted_percentiles": dict(
+                zip(
+                    map(str, percentiles),
+                    map(float, np.percentile(values, percentiles)),
+                )
+            ),
+            "sample_cells": int(values.size),
+            "sample_area_m2": area,
+            "eligible_ocean_cells": int(eligible_cells),
+            "eligible_ocean_area_m2": float(eligible_area),
+            "sample_ocean_area_fraction": area / eligible_area,
+        }
+
+    for hemisphere in ("north", "south"):
+        field = hemispheres[hemisphere]
+        for key, expected in {
+            "selected_case": "primary",
+            "selected_lag_months": 1,
+            "selected_target": "turbulent",
+        }.items():
+            require(
+                field.attrs.get(key) == expected, f"Damping requires {key}={expected}"
+            )
+        require(
+            field.gamma.attrs.get("units") == "W m-2 K-1", "Unexpected damping units"
+        )
+        domain_ocean = extratropics(ocean, hemisphere)
+        domain_area = extratropics(areas, hemisphere)
+        same_grid(field, domain_ocean)
+        wet = domain_ocean.ocean.values == 1
+        gamma = field.gamma.values
+        selected = wet & np.isfinite(gamma) & (gamma > 0) & (field.reliable.values == 1)
+        values, weights = gamma[selected], domain_area.values[selected]
+        require(
+            values.size > 0, f"No reliable positive damping samples in {hemisphere}"
+        )
+        summaries[hemisphere] = summarize(
+            values, weights, float(domain_area.values[wet].sum()), int(wet.sum())
+        )
+        all_values.append(values)
+        all_weights.append(weights)
+    pooled = summarize(
+        np.concatenate(all_values),
+        np.concatenate(all_weights),
+        sum(item["eligible_ocean_area_m2"] for item in summaries.values()),
+        sum(item["eligible_ocean_cells"] for item in summaries.values()),
+    )
+    require(
+        np.isfinite(pooled["area_weighted_mean"]) and pooled["area_weighted_mean"] > 0,
+        "Scalar damping must be finite and positive",
+    )
+    return {
+        "global": pooled,
+        "hemispheres": summaries,
+        "sphere_radius_m": radius_m,
+        "area_method": areas.attrs["method"],
+        "radius_reference": "https://confluence.ecmwf.int/pages/viewpage.action?pageId=78296363",
+        "radius_note": "ECMWF/IFS sphere used as an explicit convention, not inferred from NetCDF; radius cancels from means/fractions",
+        "selection": "ERA5 ocean (lsm<0.5), centre latitude >=20N or <=20S, finite gamma>0, source reliable==1; primary/lag1/turbulent; no H, beta or additional sea-ice selection",
+        "interpretation": "Provisional globally uniform effective damping from incomplete extratropical estimates; not a validated physical constant",
+    }
+
+
+def simulation_mask(depth, coefficients, ocean, hemisphere):
+    """Runtime mask has no dependency on gamma, open water or damping reliability."""
+    same_grid(depth, coefficients)
+    same_grid(depth, ocean)
+    require(
+        np.array_equal(coefficients.mode.values, MODES),
+        "Runtime coefficients need modes 1–12",
+    )
+    domain = depth.latitude >= 20 if hemisphere == "north" else depth.latitude <= -20
+    require(hemisphere in ("north", "south"), "Unknown hemisphere")
+    valid = (
+        (ocean.ocean == 1)
+        & domain
+        & np.isfinite(depth.H)
+        & (depth.H > 0)
+        & np.isfinite(coefficients.coefficient).all("mode")
+    )
+    output = valid.astype("i1").rename("input_valid")
+    output.attrs = {
+        "units": "1",
+        "definition": "ERA5 ocean AND extratropical centre latitude (inclusive ±20°) AND finite positive H AND all 12 finite beta; no local gamma/open-water/reliability/sea-ice requirement",
+    }
     return output
