@@ -20,6 +20,6 @@ export function createViewer(container: string): Viewer {
   });
   viewer.scene.globe.baseColor = Color.fromCssColorString("#283748");
   viewer.scene.globe.enableLighting = false;
-  viewer.camera.setView({ destination: Cartesian3.fromDegrees(15, 20, 22_000_000) });
+  viewer.camera.setView({ destination: Cartesian3.fromDegrees(15, 0, 22_000_000) });
   return viewer;
 }

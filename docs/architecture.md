@@ -41,12 +41,12 @@ Sea surface salinity remains an optional extension.
 - [experiments](../experiments/) connect preparation, configuration,
   integration and diagnostics through thin scripts calling the package.
 - [frontend](../frontend/) is an independently runnable TypeScript/Vite/Cesium
-  field viewer with in-memory synthetic sequence playback. Its validated data
+  field viewer with static JSON model sequences and synthetic demo playback. Its validated data
   boundary separates fixed grid geometry from numerical values and metadata;
   rendering, picking and UI are separate.
-  The current input is a deterministic synthetic demo. Future scientific outputs
-  can use this boundary independently of their producer. A thin API may be added
-  when required; no server or API directory is needed now. See the
+  The primary input is an offline 5° aggregate of saved pilot SST, validated
+  through the same sequence boundary as the explicitly labelled demo fallback.
+  No runtime NetCDF parser, Python server or API is involved. See the
   [frontend guide](../frontend/README.md) for the concrete data contract.
 
 Dependencies point from experiments and interfaces toward the scientific
@@ -119,6 +119,24 @@ coverage, numerical residuals, spatial statistics and output precision. Input
 checksums are checked against the preparation manifest before integration and
 again after execution. Provenance includes resolved configuration, preprocessing
 manifest, environment, code revision/dirty state and source hashes.
+
+## Offline visualization boundary
+
+[data/visualization.py](../src/ssta_model/data/visualization.py) reads only the
+two saved SST outputs, validates masks/coordinates/time alignment, and aggregates
+finite active ocean SST with saved native cell areas into 5° centre bins.
+It streams native frames, retaining only the small display sequence. Geometry is
+fixed and shared; empty tiles are omitted, empty frame/tile values are null.
+Longitude wrapping, polar and inclusive ±20° boundaries are explicit. Exact
+state timestamps are retained separately from forcing-month labels.
+
+The thin [export script](../experiments/export_sst_visualization.py) writes the
+Git-ignored static asset and a direct native-grid Matplotlib diagnostic map.
+The package does not import frontend code. Exporting changes neither the 0.25°
+scientific results nor the solver; original raw data and PCs/regressions are not
+export dependencies. Historical source paths in provenance are never opened.
+The [frontend guide](../frontend/README.md) documents the display approximation,
+static loading, fixed sequence-wide colour scale and explicit synthetic fallback.
 
 ## Reproducibility and storage
 

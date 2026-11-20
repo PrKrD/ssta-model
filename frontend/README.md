@@ -1,9 +1,10 @@
-# Time-varying numerical field viewer
+# Modelled SST and numerical field viewer
 
 A framework-free TypeScript/Vite application using CesiumJS. It runs independently
-of the Python scientific package and the earlier `globetest` repository. No API,
-ion token, remote imagery, scientific datasets or model calculations are required.
-WebGL support is required in the browser.
+of the Python scientific package and the earlier `globetest` repository. Its
+primary dataset is the exported historical SST pilot when available; otherwise
+it explicitly displays the synthetic demonstration. No Python runtime, API,
+ion token, remote imagery or model calculations run in the browser. WebGL is required.
 
 ## Run and check
 
@@ -25,19 +26,74 @@ the same cells. Reset restores p2–p98. Gray means missing data, not land.
 `npm run preview` serves the production build; a separate frontend CI job runs
 installation, build and tests without changing the Python checks.
 
-The demo starts paused. **Play/Pause** controls looping playback; the timeline
-selects any of the 120 monthly frames and shows its month and frame number.
+Both datasets start paused. **Play/Pause** controls looping playback; the timeline
+selects any monthly frame (24 pilot states or 120 demo frames) and shows its
+month and frame number. **Model pilot / Synthetic demo** links switch datasets.
 **← / →** step one frame. Scrubbing and stepping pause playback; manual steps
 stop at the first/last frame, while playing wraps from the last to the first.
 Speeds are 0.5×, 1× and 2×, with a baseline of **6 frames per second** (20 seconds
-for the full sequence at 1×). Speeds affect presentation only, never timestamps
+for the synthetic sequence at 1×). Speeds affect presentation only, never timestamps
 or underlying values. The legend and any visible tooltip show the current frame's
-full UTC timestamp. Playback is suspended while the tab is hidden and resumes
+full UTC timestamp. Model frames also show the forcing month as an end-of-month
+state label. Playback is suspended while the tab is hidden and resumes
 without catching up when it becomes visible.
 
 Cesium assets are copied locally under `/cesium` by Vite. Serve the application
 at the web server root; subpath hosting is not configured. The bundle is sizable
 because it includes Cesium. No framework or extra test runner was added.
+
+## Export the existing scientific run
+
+From the repository root, install the optional plotting dependency and export:
+
+```sh
+python -m pip install -e ".[visualization]"
+python experiments/export_sst_visualization.py
+cd frontend
+npm ci
+npm run dev
+```
+
+The exporter reads **only** `runs/historical_surface_flux_pilot/north_sst.nc` and
+`south_sst.nc`. The original raw NetCDF inputs were deliberately removed and are
+not required; do not restore them or rerun input preparation for visualization.
+Paths preserved in source provenance are historical records, not dependencies.
+The existing saved SST is neither re-integrated nor recalibrated.
+
+The generated `public/data/historical_surface_flux_pilot.json` is Git-ignored.
+Vite serves it locally and copies it into production builds. Export **before**
+`npm run build`; rebuild after regenerating the file. The browser prefers this
+asset by default, or with `?dataset=pilot`. Use `?dataset=demo` for the explicitly
+labelled synthetic demo. Missing or invalid model assets trigger a clearly
+labelled synthetic fallback, including when Vite returns HTML for an absent file.
+
+The scientific calculation stays at native **0.25°**. Its separate **5° × 5°**
+display product uses `sum(cell_area * SST) / sum(cell_area)` over finite, valid
+native model cells in each tile and month. Saved model areas are used whole.
+No land, invalid values or NaN-as-zero substitutions enter means. A tile with
+no active native cells is omitted; an occupied tile with no finite monthly values
+is `null` and renders gray. No tropical tiles are fabricated.
+
+Membership uses native cell centres and half-open `[south,north)` / `[west,east)`
+bounds. Exact internal edges go north/east; +90° is included in the last polar
+tile and −20° is included in the southern `[-25,-20]` tile. Longitude wraps to
+`[-180,180)`, so 180° belongs to −180°. Rectangles never cross the antimeridian.
+Grid order is south-to-north, then west-to-east, fixed for every frame. Native
+footprints can straddle display edges; retaining their full saved areas makes
+this an explicit centre-bin approximation, without smoothing. Mixed coastal
+rectangles represent only their valid ocean area, not an exact coastline.
+
+Tooltips retain the unmodified aggregate in K, tile bounds, assigned active native
+cell count, model-month label and exact state timestamp. For example, **January
+1979 — end-of-month model state** has boundary timestamp **1 February 1979 UTC**.
+These are model boundary states, not observed monthly means. Colour limits use
+all finite values across the complete sequence and remain fixed during playback.
+
+Numerical aggregation checks and a direct native-grid May 1980 diagnostic map are
+written under `runs/historical_surface_flux_pilot/visualization/`. See the
+[experiment guide](../experiments/README.md) for alternative input/output paths
+and regeneration after future simulations. Scientific limitations are in the
+[model guide](../docs/surface_flux_model.md).
 
 ## Components and migration
 
@@ -75,14 +131,18 @@ backend exports were removed rather than migrated. No backend code was copied.
 ## Numerical input boundary
 
 [data/field.ts](src/data/field.ts) defines and validates a deliberately small
-in-memory contract. [data/demo.ts](src/data/demo.ts) supplies the current input;
-there is no file picker, network loader or backend communication yet.
+in-memory contract. [data/load.ts](src/data/load.ts) fetches the local static
+JSON and validates it through `validateSequenceDataset`;
+[data/demo.ts](src/data/demo.ts) supplies the optional/fallback demo. There is no
+runtime NetCDF parser or backend communication.
 
 - `grid`: a stable `id` and ordered `cells`, each with a unique string `id` and
   `west`, `east`, `south`, `north` bounds in degrees east/north. Bounds are finite,
   ordered and within longitude ±180° and latitude ±90°. Longitude spans must be
   at most 180°; split antimeridian-crossing cells before entry. Cells should not
   overlap; validation does not perform a full geometric overlap check.
+  Optional `nativeCellCount` is a positive integer describing assigned active
+  scientific cells in an aggregated display tile, not per-frame finite coverage.
 - `field`: matching `gridId`, `name`, `units`, `description`, default `colorScale`
   (`sequential` or `diverging`), optional UTC ISO `timestamp`, and `values` in
   exactly the same order as `grid.cells`. A changed ordering needs a new grid ID.
@@ -91,6 +151,9 @@ there is no file picker, network loader or backend communication yet.
   `gridId`, units and cell ordering; geometry is stored once in the surrounding
   dataset. Validation rejects empty sequences, invalid timestamps and mismatched
   grid IDs, frame counts or cell counts.
+  Optional `frameLabels` supplies one nonempty human-readable label per frame;
+  `sequenceFrame` exposes the selected label as `field.timeLabel` independently
+  of its exact timestamp. Model exports use this for forcing-month alignment.
 - `null` denotes unavailable values. In-memory NaN and infinities are normalized
   to `null`; wrong types, lengths, IDs or bounds are rejected. JSON producers
   should emit `null` directly. Zero stays a valid physical value. No land mask

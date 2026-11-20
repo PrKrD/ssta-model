@@ -8,7 +8,8 @@ atmospheric forcing. The scientific starting point is A. Czaja's October 2026
 **Status:** A historical surface-heat-flux SST anomaly model with backward-Euler
 integration, validated input preparation, and an independent Cesium viewer with
 synthetic field playback. The Python model uses prescribed historical atmospheric
-variability; stochastic forcing and frontend connectivity are not implemented.
+variability. Saved SST can be exported offline to the Cesium viewer; stochastic
+forcing and live frontend communication are not implemented.
 
 ## Scientific scope
 
@@ -75,8 +76,10 @@ README guidance. Small intentional fixtures may later be tracked under
 
 Run `python experiments/prepare_model_inputs.py` to organize the seven supplied
 local NetCDF files and generate compact, validated inputs under
-`data/processed/`. Originals remain unchanged under
-`data/raw/`; both local directories are Git-ignored. See the
+`data/processed/`. This regeneration requires the originals, which were
+deliberately removed locally after preparation. Existing processed products and
+pilot outputs remain usable; visualization does not require restoring raw data.
+Both local data directories are Git-ignored. See the
 [data guide](data/README.md) for exact selections, mask-aware depth mapping,
 provisional damping, compression, and generated inventory/coverage reports.
 The first-model baseline now uses one provisional area-weighted effective damping
@@ -105,7 +108,10 @@ not constitute validation against observed SST.
 ## Frontend
 
 Use Node.js 22 or newer. From [frontend/](frontend/), run `npm ci`, then
-`npm run dev`. Use `npm test` and `npm run build` for checks. The globe displays
-arbitrary synthetic anomaly fields in K, not observations or Python model output,
-and needs no API, Cesium ion token or external imagery service. See the
+`npm run dev`. Use `npm test` and `npm run build` for checks. Export saved SST
+first with `python experiments/export_sst_visualization.py` (install the Python
+`visualization` extra for its native diagnostic map). The globe prefers this
+5° model sequence and retains an explicitly labelled selectable synthetic demo.
+Original raw data are no longer present or required for the export. The viewer
+needs no API, Cesium ion token or external imagery service. See the
 [frontend guide](frontend/README.md) for the data contract and migration details.

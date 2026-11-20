@@ -34,5 +34,20 @@ See the [experiment instructions](../experiments/README.md) and
 [scientific assumptions](../docs/surface_flux_model.md). Future stochastic runs
 must additionally record seeds and random-generator details.
 
+## Generated visualization diagnostics
+
+The offline exporter adds `visualization/export_report.json` and
+`visualization/export_report.md` under the selected run, plus the native 0.25°
+diagnostic `native_sst_1980-05.png` by default. The map reads saved SST directly,
+with longitude/latitude axes, symmetric zero-centred colours in K, and gray
+missing regions. It is independent of 5° display aggregation. It labels May's
+post-integration state at 1 June 1980 UTC, not a monthly mean.
+
+The JSON display asset is generated separately under `frontend/public/data/`
+and remains ignored. Native NetCDF outputs and source provenance are preserved.
+The export reports record their SHA-256 identities, tile/frame counts, asset
+size, null count and independent sampled area-weighted aggregation errors.
+See the [export command](../experiments/README.md#offline-sst-visualization-export).
+
 Track [experiment definitions](../experiments/) and
 [configurations](../configs/) separately from generated results.

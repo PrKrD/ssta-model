@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SSTA Model · Synthetic field viewer</title>
+    <title>SSTA Model · Field viewer</title>
   </head>
   <body>
     <main id="app">
-      <div id="globe" aria-label="Interactive synthetic field globe"></div>
+      <div id="globe" aria-label="Interactive numerical field globe"></div>
       <aside class="panel" aria-label="Field information and color controls">
-        <p class="badge">SYNTHETIC DEMONSTRATION</p>
-        <h1>Global field viewer</h1>
+        <p id="badge" class="badge">LOADING DATASET</p>
+        <h1 id="dataset-name">Global field viewer</h1>
+        <nav><a href="?dataset=pilot">Model pilot</a> · <a href="?dataset=demo">Synthetic demo</a></nav>
         <p id="description"></p>
         <p class="help">Drag to rotate · scroll to zoom · hover or tap a cell</p>
         <section id="playback" aria-label="Playback controls"></section>

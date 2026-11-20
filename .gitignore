@@ -57,3 +57,6 @@ coverage/
 !/data/README.md
 /runs/*
 !/runs/README.md
+
+# Offline generated display datasets (small test fixtures live under tests)
+/frontend/public/data/*.json

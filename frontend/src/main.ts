@@ -1,7 +1,7 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
-import { createDemoSequenceDataset } from "./data/demo";
-import { sequenceFrame, validateSequenceDataset } from "./data/field";
+import { loadDataset } from "./data/load";
+import { sequenceFrame } from "./data/field";
 import type { GridCell } from "./data/field";
 import { sortedSequenceValues } from "./globe/ColorScale";
 import { GridLayer } from "./globe/GridLayer";
@@ -19,11 +19,15 @@ function element(id: string): HTMLElement {
   return found;
 }
 
-function bootstrap(): () => void {
-  const { grid, sequence } = validateSequenceDataset(createDemoSequenceDataset());
+async function bootstrap(): Promise<() => void> {
+  const loaded = await loadDataset(new URLSearchParams(window.location.search).get("dataset") === "demo");
+  const { grid, sequence } = loaded.dataset;
   let field = sequenceFrame(sequence, 0);
   let index = 0;
   element("description").textContent = field.description;
+  element("badge").textContent = loaded.source === "model" ? "MODELLED SST · HISTORICAL PILOT" : "SYNTHETIC DEMONSTRATION";
+  element("dataset-name").textContent = field.name;
+  document.title = loaded.source === "model" ? "SSTA Model · Historical SST pilot" : "SSTA Model · Synthetic demonstration";
   const viewer = createViewer("globe");
   const layer = new GridLayer(viewer, grid, field, sortedSequenceValues(sequence.frames));
   const tooltip = new Tooltip(element("tooltip"));
@@ -47,10 +51,10 @@ function bootstrap(): () => void {
       index = state.index;
       field = sequenceFrame(sequence, index);
       layer.setField(field);
-      legend.updateTimestamp(field.timestamp);
+      legend.updateTimestamp(field.timestamp, field.timeLabel);
       refreshTooltip();
     }
-    playbackControls.show(state, field.timestamp!);
+    playbackControls.show(state, field.timestamp!, field.timeLabel);
   });
   const playbackControls = new PlaybackControls(element("playback"), sequence.frames.length, {
     toggle: () => playback.getState().playing ? playback.pause() : playback.play(),
@@ -58,11 +62,11 @@ function bootstrap(): () => void {
     step: (direction) => playback.step(direction),
     speed: (speed) => playback.setSpeed(speed),
   });
-  playbackControls.show(playback.getState(), field.timestamp!);
+  playbackControls.show(playback.getState(), field.timestamp!, field.timeLabel);
   const visibility = () => playback.setHidden(document.hidden);
   document.addEventListener("visibilitychange", visibility);
   visibility();
-  element("status").textContent = `${grid.cells.length} cells · ${sequence.frames.length} synthetic months · Fixed color limits`;
+  element("status").textContent = `${loaded.notice} · ${grid.cells.length} cells · ${sequence.frames.length} frames · Fixed color limits`;
   return () => {
     document.removeEventListener("visibilitychange", visibility);
     playback.destroy();
@@ -74,14 +78,13 @@ function bootstrap(): () => void {
   };
 }
 
-try {
-  const dispose = bootstrap();
+bootstrap().then((dispose) => {
   window.addEventListener("pagehide", dispose, { once: true });
   if (import.meta.hot) import.meta.hot.dispose(() => {
     window.removeEventListener("pagehide", dispose);
     dispose();
   });
-} catch (error) {
+}).catch((error) => {
   console.error(error);
   element("status").textContent = "Unable to start the globe. Check WebGL support and the browser console.";
-}
+});

@@ -5,6 +5,8 @@ export interface GridCell {
   east: number;
   south: number;
   north: number;
+  /** Active native model cells assigned to an aggregated display tile. */
+  nativeCellCount?: number;
 }
 
 export interface GridGeometry {
@@ -22,6 +24,7 @@ export interface NumericalField {
   colorScale: ColorScaleType;
   description: string;
   timestamp?: string;
+  timeLabel?: string;
   values: readonly (number | null)[];
 }
 
@@ -34,6 +37,7 @@ export interface FieldDataset {
 export interface FieldSequence extends Omit<NumericalField, "timestamp" | "values"> {
   timestamps: readonly string[];
   frames: readonly (readonly (number | null)[])[];
+  frameLabels?: readonly string[];
 }
 
 export interface SequenceDataset {
@@ -107,7 +111,12 @@ export function validateGrid(input: unknown): GridGeometry {
     if (west >= east || east - west > 180 || south >= north) {
       throw new Error("Cells need ordered bounds; split antimeridian or >180° cells");
     }
-    return { id, west, east, south, north };
+    if (cell.nativeCellCount !== undefined &&
+        (typeof cell.nativeCellCount !== "number" || !Number.isInteger(cell.nativeCellCount) || cell.nativeCellCount < 1)) {
+      throw new Error("nativeCellCount must be a positive integer");
+    }
+    return { id, west, east, south, north,
+      ...(cell.nativeCellCount !== undefined ? { nativeCellCount: cell.nativeCellCount as number } : {}) };
   });
   return { id, cells };
 }
@@ -130,6 +139,7 @@ export function validateField(input: unknown, grid: GridGeometry): NumericalFiel
   if (raw.timestamp !== undefined) {
     field.timestamp = timestamp(raw.timestamp);
   }
+  if (raw.timeLabel !== undefined) field.timeLabel = text(raw.timeLabel, "timeLabel");
   return field;
 }
 
@@ -159,7 +169,15 @@ export function validateSequence(input: unknown, grid: GridGeometry): FieldSeque
   }, grid);
   const frames = Array.from(raw.frames, (frame, index) =>
     index === 0 ? values : fieldValues(frame, grid.cells.length));
-  return Object.freeze({ ...metadata, timestamps: Object.freeze(timestamps), frames: Object.freeze(frames) });
+  let frameLabels: readonly string[] | undefined;
+  if (raw.frameLabels !== undefined) {
+    if (!Array.isArray(raw.frameLabels) || raw.frameLabels.length !== frames.length) {
+      throw new Error("Sequence needs one label per frame");
+    }
+    frameLabels = Object.freeze(Array.from(raw.frameLabels, (label) => text(label, "frame label")));
+  }
+  return Object.freeze({ ...metadata, timestamps: Object.freeze(timestamps), frames: Object.freeze(frames),
+    ...(frameLabels ? { frameLabels } : {}) });
 }
 
 export function validateSequenceDataset(input: unknown): SequenceDataset {
@@ -173,6 +191,7 @@ export function sequenceFrame(sequence: FieldSequence, index: number): Numerical
   if (!Number.isInteger(index) || index < 0 || index >= sequence.frames.length) {
     throw new Error("Frame index out of range");
   }
-  const { timestamps, frames, ...metadata } = sequence;
-  return { ...metadata, timestamp: timestamps[index], values: frames[index] };
+  const { timestamps, frames, frameLabels, ...metadata } = sequence;
+  return { ...metadata, timestamp: timestamps[index], values: frames[index],
+    ...(frameLabels ? { timeLabel: frameLabels[index] } : {}) };
 }

@@ -1,7 +1,13 @@
 # Local scientific inputs
 
 All raw and processed data here are Git-ignored; only this README is tracked.
-The seven supplied NetCDF files are kept with their original names under `raw/`.
+The original seven supplied NetCDF files were deliberately removed after
+preparation to save disk space. Existing processed products and saved model
+outputs remain usable. Do not restore raw files or rerun preparation for
+[visualization](../experiments/README.md#offline-sst-visualization-export).
+The preparation documentation below records the original workflow; its
+regeneration command requires separately available originals.
+During preparation, the seven files used their original names under `raw/`.
 Preparation uses same-filesystem renames, not large-file copies. Original bytes
 are verified by SHA-256 before and after processing. Other local files are left
 alone. Never commit the NetCDF products or download replacement observations as
@@ -55,7 +61,8 @@ The report gives individual file sizes, compression savings, independent compone
 coverage before/after the uniform-damping change, sampled ocean areas, and scalar
 calibration statistics. Reported NetCDF
 savings refer to the compact **working dataset**, excluding the small JSON/Markdown
-audit files. Originals remain retained: no original disk space is freed.
+audit files. The preparation step itself retained originals and freed no original
+disk space; their subsequent deliberate removal is separate from compression.
 
 ## Scientific selections
 

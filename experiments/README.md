@@ -47,3 +47,30 @@ hemisphere; it does not retain a full time-space cube. The full period is not
 run automatically. Read the [model guide](../docs/surface_flux_model.md) for
 equations, units, time alignment, numerical checks and physical limitations,
 and the [output guide](../runs/README.md) for diagnostics and provenance.
+
+## Offline SST visualization export
+
+For an existing completed run, from the repository root:
+
+```sh
+python -m pip install -e ".[visualization]"
+python experiments/export_sst_visualization.py
+```
+
+This reads only the two saved SST NetCDF outputs, exports a fixed 5° area-weighted
+display sequence to `frontend/public/data/historical_surface_flux_pilot.json`,
+and writes export checks/report plus `native_sst_1980-05.png` under the run's
+`visualization/` directory. Matplotlib is optional for the package and required
+by this command's diagnostic map. The reusable `export_visualization` function
+can export JSON without Matplotlib. No new scientific integration is performed.
+
+Original raw datasets were deliberately removed and are not dependencies. Do not
+run input preparation to visualize saved output. The exporter does not read PCs,
+regressions, prepared-input files, or historical provenance paths.
+
+To regenerate after another completed simulation, pass `--run-dir PATH` and
+optionally `--output PATH` and `--map-month YYYY-MM`. For the existing viewer's
+default loader, keep the default JSON destination. Start the viewer with
+`cd frontend` then `npm run dev`; build after exporting if using production
+preview. See [frontend instructions](../frontend/README.md) for binning, masks,
+time labels, coastline approximations and the selectable synthetic fallback.

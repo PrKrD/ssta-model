@@ -46,12 +46,12 @@ export class PlaybackControls {
     this.speed.addEventListener("change", () => actions.speed(Number(this.speed.value)), options);
   }
 
-  show(state: PlaybackState, timestamp: string): void {
+  show(state: PlaybackState, timestamp: string, timeLabel?: string): void {
     this.play.textContent = state.playing ? "Pause" : "Play";
     this.play.setAttribute("aria-pressed", String(state.playing));
     this.timeline.value = String(state.index);
-    this.timeline.setAttribute("aria-valuetext", `${timestamp}, frame ${state.index + 1} of ${this.frameCount}`);
-    this.time.textContent = `${timestamp.slice(0, 7)} · ${state.index + 1}/${this.frameCount}`;
+    this.timeline.setAttribute("aria-valuetext", `${timeLabel ?? timestamp}, frame ${state.index + 1} of ${this.frameCount}`);
+    this.time.textContent = `${timeLabel ?? timestamp.slice(0, 7)} · ${state.index + 1}/${this.frameCount}`;
     this.previous.disabled = state.index === 0;
     this.next.disabled = state.index === this.frameCount - 1;
     this.speed.value = String(state.speed);

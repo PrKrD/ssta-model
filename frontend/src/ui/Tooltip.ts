@@ -12,7 +12,9 @@ export class Tooltip {
       `Latitude bounds: ${cell.south}° to ${cell.north}°`,
       `Longitude bounds: ${cell.west}° to ${cell.east}°`,
       `${field.name}: ${value === null ? "Missing data" : `${value.toPrecision(5)} ${field.units}`}`,
-      ...(field.timestamp ? [`Timestamp: ${field.timestamp}`] : []),
+      ...(cell.nativeCellCount !== undefined ? [`Spatial aggregate · ${cell.nativeCellCount} native model cells in tile (finite values only)`] : []),
+      ...(field.timeLabel ? [field.timeLabel] : []),
+      ...(field.timestamp ? [`State timestamp: ${field.timestamp}`] : []),
     ].join("\n");
     this.element.hidden = false;
     const margin = 10;

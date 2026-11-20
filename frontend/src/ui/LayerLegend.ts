@@ -17,7 +17,7 @@ export class LayerLegend {
     };
     line(`${field.name} · ${field.units}`, "legend-title");
     this.timestamp = line("", "help");
-    this.updateTimestamp(field.timestamp);
+    this.updateTimestamp(field.timestamp, field.timeLabel);
     if (!scale) {
       line("No finite values available");
     } else {
@@ -35,13 +35,13 @@ export class LayerLegend {
         ? "symmetric limits; neutral = zero"
         : "square-root normalization"}`, "help");
     }
-    line(`■ Gray = missing data${field.units === "1" ? " · 1 = dimensionless" : ""}`, "missing");
+    line(`■ Gray = missing data · Bare globe = omitted region${field.units === "1" ? " · 1 = dimensionless" : ""}`, "missing");
   }
 
   /** Time changes do not regenerate the fixed gradient and scale labels. */
-  updateTimestamp(timestamp?: string): void {
+  updateTimestamp(timestamp?: string, timeLabel?: string): void {
     if (!this.timestamp) return;
     this.timestamp.hidden = timestamp === undefined;
-    this.timestamp.textContent = timestamp ? `Timestamp: ${timestamp}` : "";
+    this.timestamp.textContent = timestamp ? `${timeLabel ? `${timeLabel} · ` : ""}State timestamp: ${timestamp}` : "";
   }
 }
