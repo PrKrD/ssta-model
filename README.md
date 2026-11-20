@@ -5,8 +5,8 @@ interpretable global sea surface temperature (SST) anomaly model with stochastic
 atmospheric forcing. The scientific starting point is A. Czaja's October 2026
 *Notes on slab mixed layer heat and salt budgets: long timescales*.
 
-**Status:** Python architectural foundation plus a standalone Cesium static-field
-viewer using clearly labelled synthetic data. No physics, stochastic forcing,
+**Status:** Python architectural foundation plus a standalone Cesium viewer with
+time-varying synthetic field playback. No physics, stochastic forcing,
 scientific data processing algorithms or numerical integration are implemented.
 
 ## Scientific scope
@@ -37,7 +37,7 @@ not a runtime dependency. No backend or scientific calculations were migrated.
 | [experiments/](experiments/) | Tracked research definitions and thin scripts |
 | [tests/](tests/) | Package checks and future controlled scientific tests |
 | [docs/](docs/) | Architecture and scientific implementation documentation |
-| [frontend/](frontend/) | Standalone Cesium static-field viewer and synthetic demo |
+| [frontend/](frontend/) | Standalone Cesium viewer and synthetic field playback |
 | [data/](data/) | Ignored local datasets and processing intermediates |
 | [runs/](runs/) | Ignored generated results, logs, plots and diagnostics |
 | [.github/workflows/](.github/workflows/) | Continuous integration |
@@ -73,8 +73,8 @@ README guidance. Small intentional fixtures may later be tracked under
 
 Use Node.js 22 or newer. From [frontend/](frontend/), run `npm ci`, then
 `npm run dev`. Use `npm test` and `npm run build` for checks. The globe displays
-synthetic dimensionless data, not observations or Python model output, and needs
-no API, Cesium ion token or external imagery service. See the
+arbitrary synthetic anomaly fields in K, not observations or Python model output,
+and needs no API, Cesium ion token or external imagery service. See the
 [frontend guide](frontend/README.md) for the data contract and migration details.
 
 The next scientific milestone is to specify the first heat-flux-and-damping

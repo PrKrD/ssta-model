@@ -19,6 +19,17 @@ export function sortedValues(values: readonly (number | null)[]): number[] {
     .sort((a, b) => a - b);
 }
 
+/** Resolve the time-independent population once, outside the playback loop. */
+export function sortedSequenceValues(frames: readonly (readonly (number | null)[])[]): number[] {
+  const population: number[] = [];
+  for (const frame of frames) {
+    for (const value of frame) {
+      if (value !== null && Number.isFinite(value)) population.push(value);
+    }
+  }
+  return population.sort((a, b) => a - b);
+}
+
 /** Linear interpolation of ranks in an ascending finite population. */
 export function quantile(sorted: readonly number[], percentile: number): number | undefined {
   if (!Number.isFinite(percentile) || percentile < 0 || percentile > 100) {

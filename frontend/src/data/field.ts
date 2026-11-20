@@ -22,12 +22,23 @@ export interface NumericalField {
   colorScale: ColorScaleType;
   description: string;
   timestamp?: string;
-  values: (number | null)[];
+  values: readonly (number | null)[];
 }
 
 export interface FieldDataset {
   grid: GridGeometry;
   field: NumericalField;
+}
+
+/** One fixed cell ordering and common metadata for every timestamp. */
+export interface FieldSequence extends Omit<NumericalField, "timestamp" | "values"> {
+  timestamps: readonly string[];
+  frames: readonly (readonly (number | null)[])[];
+}
+
+export interface SequenceDataset {
+  grid: GridGeometry;
+  sequence: FieldSequence;
 }
 
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -49,6 +60,31 @@ function coordinate(value: unknown, limit: number, label: string): number {
     throw new Error(`${label} must be finite and within ±${limit} degrees`);
   }
   return value;
+}
+
+function timestamp(value: unknown): string {
+  const result = text(value, "timestamp");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(result) ||
+      !Number.isFinite(Date.parse(result)) ||
+      new Date(result).toISOString().slice(0, 19) !== result.slice(0, 19)) {
+    throw new Error("timestamp must be a UTC ISO timestamp");
+  }
+  return result;
+}
+
+/** Freeze owned values once; validated sequence frames can then be reused. */
+function fieldValues(input: unknown, cellCount: number): readonly (number | null)[] {
+  if (!Array.isArray(input) || input.length !== cellCount) {
+    throw new Error("Field values must match grid.cells length and order");
+  }
+  let hasNonfinite = false;
+  for (const value of input) {
+    if (value === null) continue;
+    if (typeof value !== "number") throw new Error("Values must be numbers or null");
+    if (!Number.isFinite(value)) hasNonfinite = true;
+  }
+  if (Object.isFrozen(input) && !hasNonfinite) return input;
+  return Object.freeze(Array.from(input, (value) => Number.isFinite(value) ? value : null));
 }
 
 /** Validate at entry, copying inputs so raw payloads cannot mutate the viewer. */
@@ -79,18 +115,10 @@ export function validateGrid(input: unknown): GridGeometry {
 export function validateField(input: unknown, grid: GridGeometry): NumericalField {
   const raw = object(input, "field");
   if (raw.gridId !== grid.id) throw new Error("field.gridId does not match grid.id");
-  if (!Array.isArray(raw.values) || raw.values.length !== grid.cells.length) {
-    throw new Error("Field values must match grid.cells length and order");
-  }
   if (raw.colorScale !== "sequential" && raw.colorScale !== "diverging") {
     throw new Error("colorScale must be sequential or diverging");
   }
-  const values = Array.from(raw.values, (value) => {
-    if (value === null) return null;
-    if (typeof value !== "number") throw new Error("Values must be numbers or null");
-    // Non-finite in-memory values are treated as unavailable, never as zero.
-    return Number.isFinite(value) ? value : null;
-  });
+  const values = fieldValues(raw.values, grid.cells.length);
   const field: NumericalField = {
     gridId: grid.id,
     name: text(raw.name, "field.name"),
@@ -100,13 +128,7 @@ export function validateField(input: unknown, grid: GridGeometry): NumericalFiel
     values,
   };
   if (raw.timestamp !== undefined) {
-    const timestamp = text(raw.timestamp, "field.timestamp");
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(timestamp) ||
-        !Number.isFinite(Date.parse(timestamp)) ||
-        new Date(timestamp).toISOString().slice(0, 19) !== timestamp.slice(0, 19)) {
-      throw new Error("timestamp must be a UTC ISO timestamp");
-    }
-    field.timestamp = timestamp;
+    field.timestamp = timestamp(raw.timestamp);
   }
   return field;
 }
@@ -116,4 +138,41 @@ export function validateDataset(input: unknown): FieldDataset {
   const raw = object(input, "dataset");
   const grid = validateGrid(raw.grid);
   return { grid, field: validateField(raw.field, grid) };
+}
+
+export function validateSequence(input: unknown, grid: GridGeometry): FieldSequence {
+  const raw = object(input, "sequence");
+  if (!Array.isArray(raw.timestamps) || !raw.timestamps.length ||
+      !Array.isArray(raw.frames) || raw.frames.length !== raw.timestamps.length) {
+    throw new Error("Sequence needs one frame per timestamp and at least one frame");
+  }
+  const timestamps = Array.from(raw.timestamps, timestamp);
+  for (let i = 1; i < timestamps.length; i++) {
+    if (Date.parse(timestamps[i]) <= Date.parse(timestamps[i - 1])) {
+      throw new Error("Sequence timestamps must be strictly increasing");
+    }
+  }
+  // Validate common metadata once, then validate every frame against this grid.
+  const { values, timestamp: _timestamp, ...metadata } = validateField({
+    gridId: raw.gridId, name: raw.name, units: raw.units,
+    description: raw.description, colorScale: raw.colorScale, values: raw.frames[0],
+  }, grid);
+  const frames = Array.from(raw.frames, (frame, index) =>
+    index === 0 ? values : fieldValues(frame, grid.cells.length));
+  return Object.freeze({ ...metadata, timestamps: Object.freeze(timestamps), frames: Object.freeze(frames) });
+}
+
+export function validateSequenceDataset(input: unknown): SequenceDataset {
+  const raw = object(input, "dataset");
+  const grid = validateGrid(raw.grid);
+  return { grid, sequence: validateSequence(raw.sequence, grid) };
+}
+
+/** Small metadata wrapper; the immutable frame values are not copied. */
+export function sequenceFrame(sequence: FieldSequence, index: number): NumericalField {
+  if (!Number.isInteger(index) || index < 0 || index >= sequence.frames.length) {
+    throw new Error("Frame index out of range");
+  }
+  const { timestamps, frames, ...metadata } = sequence;
+  return { ...metadata, timestamp: timestamps[index], values: frames[index] };
 }

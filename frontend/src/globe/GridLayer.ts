@@ -13,13 +13,16 @@ export class GridLayer {
   private readonly primitive: Primitive;
   private readonly cellsById: Map<string, number>;
   private field: NumericalField;
-  private population: number[] = [];
+  private population: readonly number[] = [];
   private scale: ResolvedColorScale | null = null;
   private removeReadyListener: (() => void) | undefined;
   private range = defaultRange();
   private scaleType: ColorScaleType;
 
-  constructor(private viewer: Viewer, grid: GridGeometry, field: NumericalField) {
+  constructor(
+    private viewer: Viewer, grid: GridGeometry, field: NumericalField,
+    private readonly sequencePopulation?: readonly number[],
+  ) {
     this.grid = validateGrid(grid);
     this.field = validateField(field, this.grid);
     this.scaleType = this.field.colorScale;
@@ -48,16 +51,18 @@ export class GridLayer {
   }
 
   private resolve(): void {
-    this.population = sortedValues(this.field.values);
+    this.population = this.sequencePopulation ?? sortedValues(this.field.values);
     this.scale = resolveScale(this.scaleType, this.population, this.range);
   }
 
-  /** A new static field on this grid needs no geometry or viewer rebuild. */
+  /** Sequence playback retains its resolved scale and immutable frame arrays. */
   setField(field: NumericalField): void {
     const next = validateField(field, this.grid);
     this.field = next;
-    this.scaleType = next.colorScale;
-    this.resolve();
+    if (!this.sequencePopulation) {
+      this.scaleType = next.colorScale;
+      this.resolve();
+    }
     this.updateColors();
   }
 
@@ -70,7 +75,7 @@ export class GridLayer {
   }
 
   getColorScale(): ResolvedColorScale | null { return this.scale; }
-  getField(): NumericalField { return { ...this.field, values: [...this.field.values] }; }
+  getField(): NumericalField { return { ...this.field }; }
 
   getValue(cell: GridCell): number | null {
     const index = this.cellsById.get(cell.id);

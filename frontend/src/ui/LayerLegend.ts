@@ -3,6 +3,7 @@ import { legendStops } from "../globe/ColorScale";
 import type { ResolvedColorScale } from "../globe/ColorScale";
 
 export class LayerLegend {
+  private timestamp: HTMLElement | null = null;
   constructor(private element: HTMLElement) {}
 
   show(field: NumericalField, scale: ResolvedColorScale | null): void {
@@ -15,7 +16,8 @@ export class LayerLegend {
       return element;
     };
     line(`${field.name} · ${field.units}`, "legend-title");
-    if (field.timestamp) line(`Timestamp: ${field.timestamp}`, "help");
+    this.timestamp = line("", "help");
+    this.updateTimestamp(field.timestamp);
     if (!scale) {
       line("No finite values available");
     } else {
@@ -34,5 +36,12 @@ export class LayerLegend {
         : "square-root normalization"}`, "help");
     }
     line(`■ Gray = missing data${field.units === "1" ? " · 1 = dimensionless" : ""}`, "missing");
+  }
+
+  /** Time changes do not regenerate the fixed gradient and scale labels. */
+  updateTimestamp(timestamp?: string): void {
+    if (!this.timestamp) return;
+    this.timestamp.hidden = timestamp === undefined;
+    this.timestamp.textContent = timestamp ? `Timestamp: ${timestamp}` : "";
   }
 }
