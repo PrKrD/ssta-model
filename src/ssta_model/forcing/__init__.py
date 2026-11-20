@@ -1,1 +1,1 @@
-"""Future stochastic atmospheric forcing and spatial forcing patterns."""
+"""Historical prescribed atmospheric forcing; stochastic generation is not implemented."""

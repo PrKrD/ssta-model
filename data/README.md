@@ -143,15 +143,20 @@ Compression is lossless NetCDF4 zlib level 4 with shuffle. Binary 0/1/NaN flags
 use reversible int8 storage with an explicit missing sentinel. Chunks suit
 spatial tiles and monthly PC blocks; no global time-by-space forcing cube is saved.
 
-## Future consumption
+## Runtime consumption
 
-The future scientific core can independently load a hemisphere's PC, coefficient
-and H-only surface files with xarray, assert exact time/mode/grid compatibility,
-read the scalar damping configuration and use the documented `input_valid` mask.
+The scientific core independently loads a hemisphere's PC, coefficient
+and H-only surface files with xarray, asserts exact time/mode/grid compatibility,
+reads the scalar damping configuration and uses the documented `input_valid` mask.
 Local spatial gamma is not a simulation input. Preparation and
-parameter selection happen outside numerical integration. The current pipeline
+parameter selection happen outside numerical integration. The preparation pipeline
 does not integrate heat budgets, generate stochastic forcing, refit spatial
 damping or communicate with the frontend.
+
+The separate [historical experiment](../experiments/README.md) consumes these
+products without modifying them. Its
+[runtime loader](../src/ssta_model/data/runtime.py) validates coordinates, units,
+modes and masks. Integration never opens raw spatial damping.
 
 Implementation is in [ssta_model.data](../src/ssta_model/data/), with a thin
 [entry script](../experiments/prepare_model_inputs.py). Controlled synthetic

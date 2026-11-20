@@ -5,10 +5,10 @@ interpretable global sea surface temperature (SST) anomaly model with stochastic
 atmospheric forcing. The scientific starting point is A. Czaja's October 2026
 *Notes on slab mixed layer heat and salt budgets: long timescales*.
 
-**Status:** Python input preparation plus a standalone Cesium viewer with
-time-varying synthetic field playback. The supplied scientific inputs can be
-organized, losslessly compressed and validated. No model physics, stochastic
-forcing or numerical integration is implemented.
+**Status:** A historical surface-heat-flux SST anomaly model with backward-Euler
+integration, validated input preparation, and an independent Cesium viewer with
+synthetic field playback. The Python model uses prescribed historical atmospheric
+variability; stochastic forcing and frontend connectivity are not implemented.
 
 ## Scientific scope
 
@@ -29,14 +29,14 @@ not a runtime dependency. No backend or scientific calculations were migrated.
 
 | Path | Purpose |
 | --- | --- |
-| [src/ssta_model/core/](src/ssta_model/core/) | Future orchestration, configuration, grids, state and integration |
+| [src/ssta_model/core/](src/ssta_model/core/) | Configuration, monthly orchestration and backward-Euler integration |
 | [src/ssta_model/physics/](src/ssta_model/physics/) | Independent physical tendency calculations |
 | [src/ssta_model/forcing/](src/ssta_model/forcing/) | Atmospheric forcing and statistically derived spatial patterns |
 | [src/ssta_model/data/](src/ssta_model/data/) | Scientific input selection, preparation and validation |
 | [src/ssta_model/analysis/](src/ssta_model/analysis/) | Diagnostics, validation and statistical analysis |
 | [configs/](configs/) | Tracked experiment configurations |
 | [experiments/](experiments/) | Tracked research definitions and thin scripts |
-| [tests/](tests/) | Package checks and future controlled scientific tests |
+| [tests/](tests/) | Controlled scientific, numerical and input/output tests |
 | [docs/](docs/) | Architecture and scientific implementation documentation |
 | [frontend/](frontend/) | Standalone Cesium viewer and synthetic field playback |
 | [data/](data/) | Ignored local datasets and processing intermediates |
@@ -44,7 +44,8 @@ not a runtime dependency. No backend or scientific calculations were migrated.
 | [.github/workflows/](.github/workflows/) | Continuous integration |
 
 See [architecture](docs/architecture.md) for boundaries and future conventions.
-Scientific simulation subpackages still contain only descriptive docstrings.
+The [surface-flux model guide](docs/surface_flux_model.md) specifies the implemented
+equations, data contracts and remaining physical limitations.
 
 ## Development setup
 
@@ -81,7 +82,25 @@ provisional damping, compression, and generated inventory/coverage reports.
 The first-model baseline now uses one provisional area-weighted effective damping
 coefficient in [configuration](configs/surface_damping.toml). Runtime spatial
 products contain H and its validity information; local damping gaps do not limit
-the active domain. No numerical integration is implemented yet.
+the active domain.
+
+## Historical SST pilot
+
+With the prepared local inputs available, run from the repository root:
+
+```sh
+python experiments/run_historical_surface_flux.py
+```
+
+The [pilot configuration](configs/historical_surface_flux_pilot.toml) integrates
+January 1979–December 1980 from zero SST anomalies with historical turbulent
+heat-flux forcing and uniform damping. Each hemisphere streams monthly SST
+states and numerical diagnostics to a new directory under [runs/](runs/).
+States use exact interval-end timestamps with explicit forcing-month labels.
+Existing output directories are never overwritten. See the
+[experiment guide](experiments/README.md) for switches, sensitivity overrides
+and configuring the full January 1979–October 2026 record. Numerical checks do
+not constitute validation against observed SST.
 
 ## Frontend
 
@@ -90,7 +109,3 @@ Use Node.js 22 or newer. From [frontend/](frontend/), run `npm ci`, then
 arbitrary synthetic anomaly fields in K, not observations or Python model output,
 and needs no API, Cesium ion token or external imagery service. See the
 [frontend guide](frontend/README.md) for the data contract and migration details.
-
-The next scientific milestone is to specify the first heat-flux-and-damping
-model's units, sign conventions, data contracts and controlled validation cases
-before implementing it.

@@ -1,1 +1,1 @@
-"""Future independent physical SST tendency calculations."""
+"""Independent physical SST tendency calculations, starting with surface heat flux."""

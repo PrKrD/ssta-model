@@ -17,9 +17,21 @@ are in local `data/processed/manifest.json` and `data/processed/report.md`. See 
 [data guide](../data/README.md) for selection, area weights and scientific limits.
 
 Regeneration overwrites the generated baseline, not unrelated configurations.
-For future sensitivity studies, copy it to a different experiment configuration
-and override the scalar there. No solver or override-resolution system is
-implemented yet. The value is provisional, not a validated physical constant.
+The value is provisional, not a validated physical constant.
+
+## Historical surface-flux experiment
+
+[historical_surface_flux_pilot.toml](historical_surface_flux_pilot.toml) defines
+the 24-month pilot, physical constants, initial state, input/output paths and
+two physics switches. It reads the baseline above by default. To override the
+coefficient for sensitivity analysis, copy the pilot configuration, select a new
+output directory and add a finite nonnegative `gamma_w_m2_k` under its
+`[surface_damping]` section. `configuration` may also identify another constant
+damping TOML file. Neither approach modifies the prepared spatial inputs.
+
+See the [experiment guide](../experiments/README.md) for commands and full-record
+settings; the [model guide](../docs/surface_flux_model.md) defines the equations
+and switch semantics.
 
 Keep experiment parameters/units and future random seeds explicit. Reference
 local datasets without secrets or machine-specific absolute paths. Generated

@@ -1,1 +1,1 @@
-"""Future simulation orchestration, configuration, grids, state and integration."""
+"""Explicit experiment configuration, historical time loop and NumPy integration."""
