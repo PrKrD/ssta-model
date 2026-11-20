@@ -5,8 +5,9 @@ interpretable global sea surface temperature (SST) anomaly model with stochastic
 atmospheric forcing. The scientific starting point is A. Czaja's October 2026
 *Notes on slab mixed layer heat and salt budgets: long timescales*.
 
-**Status:** architectural foundation only. No physics, stochastic forcing, data
-processing algorithms, numerical integration or frontend are implemented.
+**Status:** Python architectural foundation plus a standalone Cesium static-field
+viewer using clearly labelled synthetic data. No physics, stochastic forcing,
+scientific data processing algorithms or numerical integration are implemented.
 
 ## Scientific scope
 
@@ -19,8 +20,9 @@ horizontal diffusion. Sea surface salinity is an optional extension, not an
 established requirement.
 
 The scientific Python package must run independently of any web interface.
-The existing `globetest` project is an earlier experimental prototype, not a
-runtime dependency; no code has been migrated from it.
+The `globetest` project is an earlier experimental prototype. Its useful globe
+rendering and UI patterns have been adapted into the independent frontend; it is
+not a runtime dependency. No backend or scientific calculations were migrated.
 
 ## Repository layout
 
@@ -35,7 +37,7 @@ runtime dependency; no code has been migrated from it.
 | [experiments/](experiments/) | Tracked research definitions and thin scripts |
 | [tests/](tests/) | Package checks and future controlled scientific tests |
 | [docs/](docs/) | Architecture and scientific implementation documentation |
-| [frontend/](frontend/) | Future interactive visualisation application |
+| [frontend/](frontend/) | Standalone Cesium static-field viewer and synthetic demo |
 | [data/](data/) | Ignored local datasets and processing intermediates |
 | [runs/](runs/) | Ignored generated results, logs, plots and diagnostics |
 | [.github/workflows/](.github/workflows/) | Continuous integration |
@@ -67,6 +69,14 @@ Track experiment definitions and configurations. Write generated outputs under
 README guidance. Small intentional fixtures may later be tracked under
 [tests/](tests/).
 
-The next milestone is to specify the first heat-flux-and-damping model's units,
-sign conventions, data contracts and controlled validation cases before
-implementing it.
+## Frontend
+
+Use Node.js 22 or newer. From [frontend/](frontend/), run `npm ci`, then
+`npm run dev`. Use `npm test` and `npm run build` for checks. The globe displays
+synthetic dimensionless data, not observations or Python model output, and needs
+no API, Cesium ion token or external imagery service. See the
+[frontend guide](frontend/README.md) for the data contract and migration details.
+
+The next scientific milestone is to specify the first heat-flux-and-damping
+model's units, sign conventions, data contracts and controlled validation cases
+before implementing it.

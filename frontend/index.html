@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSTA Model · Synthetic field viewer</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="globe" aria-label="Interactive synthetic field globe"></div>
+      <aside class="panel" aria-label="Field information and color controls">
+        <p class="badge">SYNTHETIC DEMONSTRATION</p>
+        <h1>Global field viewer</h1>
+        <p id="description"></p>
+        <p class="help">Drag to rotate · scroll to zoom · hover or tap a cell</p>
+        <section id="controls" aria-label="Color controls"></section>
+        <section id="legend" aria-label="Field legend" aria-live="polite"></section>
+        <p id="status" role="status">Preparing globe…</p>
+      </aside>
+      <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
