@@ -5,7 +5,8 @@
 This repository supports a research model, not a general-purpose modelling
 framework. Package docstrings establish boundaries without speculative classes,
 registries, solvers or configuration systems. Add modules when their actual
-functionality is developed. No scientific calculations are implemented yet.
+functionality is developed. Input preparation is implemented; model tendencies,
+forcing integration and numerical timestepping are not.
 
 The model assumes geographically varying but temporally fixed late-winter
 mixed-layer depth. Start with surface heat flux forcing and temperature-dependent
@@ -20,7 +21,13 @@ Sea surface salinity remains an optional extension.
   tendencies from explicit state, parameters and fields.
 - [forcing](../src/ssta_model/forcing/) will supply atmospheric forcing,
   including stochastic forcing informed by estimated spatial patterns.
-- [data](../src/ssta_model/data/) will load, standardise and prepare datasets.
+- [data](../src/ssta_model/data/) selects and prepares the supplied scientific
+  inputs, preserves provenance, compresses products and validates data contracts.
+  [model_inputs.py](../src/ssta_model/data/model_inputs.py) owns scientific
+  selections and mask-aware depth mapping; [prepare.py](../src/ssta_model/data/prepare.py)
+  owns local file organization, lossless output checks and reporting. The
+  [entry script](../experiments/prepare_model_inputs.py) is a thin caller. Runtime
+  integration will consume prepared fields rather than raw diagnostic datasets.
 - [analysis](../src/ssta_model/analysis/) will diagnose outputs, validate models
   and perform statistical analysis, including parameter estimation when needed.
 - [experiments](../experiments/) will connect preparation, configuration,
@@ -52,7 +59,8 @@ Estimating forcing patterns, damping or other parameters from datasets is a
 preparation or analysis task. Applying prepared parameters during integration
 is a separate calculation. Do not repeatedly fit parameters or read raw
 observations inside timestepping. No parameter values or dataset choices are
-established by this foundation.
+invented by the software; current supplied-input choices are documented in the
+[data guide](../data/README.md). No parameters are refitted during preparation.
 
 To add a process, document its assumptions and inputs, implement its calculation
 in the relevant package, test it in isolation, then connect it explicitly to the
@@ -74,9 +82,10 @@ Before implementing a scientific component, specify:
   in time, including treatment of invalid or masked depths.
 - Metadata describing assumptions, provenance and standardisation.
 
-Choose concrete array libraries and representations when implementation requires
-them. This foundation sets no numerical values, dataset specifications, grid
-resolution or unvalidated scientific conventions.
+Prepared inputs use xarray/NetCDF with explicit units, mode/time coordinates and
+the supplied native ERA5 grid. The [data guide](../data/README.md) specifies their
+validated contracts. Future scientific components must establish their own
+compatible contracts; preparation does not establish a numerical solver.
 
 ## Reproducibility and storage
 
@@ -93,6 +102,7 @@ alongside outputs so experiments can be repeated independently. Do not introduce
 a run manager or schema until needed.
 
 Only the README files in local data and run directories are tracked. Small,
-intentional fixtures may live under tests. NumPy, SciPy, xarray and NetCDF
-readers will be introduced with functionality that needs them; the current
-runtime dependency list is empty.
+intentional fixtures may live under tests. NumPy, xarray and netCDF4 support
+input preparation. Local raw and processed datasets remain ignored; the generated
+manifest/report alongside compact products record actual source inventories,
+checksums, selections, lossless precision checks and coverage intersections.

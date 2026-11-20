@@ -5,9 +5,10 @@ interpretable global sea surface temperature (SST) anomaly model with stochastic
 atmospheric forcing. The scientific starting point is A. Czaja's October 2026
 *Notes on slab mixed layer heat and salt budgets: long timescales*.
 
-**Status:** Python architectural foundation plus a standalone Cesium viewer with
-time-varying synthetic field playback. No physics, stochastic forcing,
-scientific data processing algorithms or numerical integration are implemented.
+**Status:** Python input preparation plus a standalone Cesium viewer with
+time-varying synthetic field playback. The supplied scientific inputs can be
+organized, losslessly compressed and validated. No model physics, stochastic
+forcing or numerical integration is implemented.
 
 ## Scientific scope
 
@@ -31,7 +32,7 @@ not a runtime dependency. No backend or scientific calculations were migrated.
 | [src/ssta_model/core/](src/ssta_model/core/) | Future orchestration, configuration, grids, state and integration |
 | [src/ssta_model/physics/](src/ssta_model/physics/) | Independent physical tendency calculations |
 | [src/ssta_model/forcing/](src/ssta_model/forcing/) | Atmospheric forcing and statistically derived spatial patterns |
-| [src/ssta_model/data/](src/ssta_model/data/) | Reusable loading, standardisation and preprocessing |
+| [src/ssta_model/data/](src/ssta_model/data/) | Scientific input selection, preparation and validation |
 | [src/ssta_model/analysis/](src/ssta_model/analysis/) | Diagnostics, validation and statistical analysis |
 | [configs/](configs/) | Tracked experiment configurations |
 | [experiments/](experiments/) | Tracked research definitions and thin scripts |
@@ -43,7 +44,7 @@ not a runtime dependency. No backend or scientific calculations were migrated.
 | [.github/workflows/](.github/workflows/) | Continuous integration |
 
 See [architecture](docs/architecture.md) for boundaries and future conventions.
-Subpackages currently contain only descriptive docstrings.
+Scientific simulation subpackages still contain only descriptive docstrings.
 
 ## Development setup
 
@@ -60,14 +61,23 @@ ruff format --check .
 
 Apply formatting with `ruff format .`. CI runs the same installation and checks
 on Python 3.11 and 3.12. Hatchling builds the `src/` package; pytest and Ruff are
-the only development tools. There are currently no runtime dependencies.
-NumPy, SciPy, xarray and suitable NetCDF libraries are likely future scientific
-dependencies and will be added when required by implemented functionality.
+the only development tools. NumPy, xarray and netCDF4 support the implemented
+input-preparation pipeline. Additional scientific dependencies will be added
+when required by implemented functionality.
 
 Track experiment definitions and configurations. Write generated outputs under
 [runs/](runs/), and local datasets under [data/](data/); both retain tracked
 README guidance. Small intentional fixtures may later be tracked under
 [tests/](tests/).
+
+## Scientific input preparation
+
+Run `python experiments/prepare_model_inputs.py` to organize the seven supplied
+local NetCDF files and generate compact, validated inputs under
+`data/processed/`. Originals remain unchanged under
+`data/raw/`; both local directories are Git-ignored. See the
+[data guide](data/README.md) for exact selections, mask-aware depth mapping,
+provisional damping, compression, and generated inventory/coverage reports.
 
 ## Frontend
 

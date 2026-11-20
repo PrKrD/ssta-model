@@ -1,1 +1,1 @@
-"""Future reusable data loading, standardisation and preprocessing."""
+"""Reusable scientific input preparation, separate from model integration."""
