@@ -25,8 +25,13 @@ Sea surface salinity remains an optional extension.
   and perform statistical analysis, including parameter estimation when needed.
 - [experiments](../experiments/) will connect preparation, configuration,
   integration and diagnostics through thin scripts calling the package.
-- [frontend](../frontend/) will visualise outputs. A future thin API may call
-  the package when required; no server or API directory is needed now.
+- [frontend](../frontend/) is an independently runnable TypeScript/Vite/Cesium
+  static-field viewer. Its validated data boundary separates fixed grid geometry
+  from numerical values and metadata; rendering, picking and UI are separate.
+  The current input is a deterministic synthetic demo. Future scientific outputs
+  can use this boundary independently of their producer. A thin API may be added
+  when required; no server or API directory is needed now. See the
+  [frontend guide](../frontend/README.md) for the concrete data contract.
 
 Dependencies point from experiments and interfaces toward the scientific
 package. Within integration, core calls physics and forcing; those calculations
