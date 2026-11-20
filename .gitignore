@@ -1,0 +1,59 @@
+# Python environments, caches and tooling
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+._*
+*.swp
+*.swo
+*~
+
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Future frontend dependencies and build caches
+node_modules/
+.next/
+.nuxt/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Temporary outputs; intentional fixtures remain trackable elsewhere
+*.log
+*.tmp
+.ipynb_checkpoints/
+/tmp/
+/outputs/
+/plots/
+
+# Local datasets and generated runs; keep directory guidance
+/data/*
+!/data/README.md
+/runs/*
+!/runs/README.md
