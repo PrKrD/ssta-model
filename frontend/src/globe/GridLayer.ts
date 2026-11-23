@@ -21,7 +21,7 @@ export class GridLayer {
 
   constructor(
     private viewer: Viewer, grid: GridGeometry, field: NumericalField,
-    private readonly sequencePopulation?: readonly number[],
+    private sequencePopulation?: readonly number[],
   ) {
     this.grid = validateGrid(grid);
     this.field = validateField(field, this.grid);
@@ -72,6 +72,12 @@ export class GridLayer {
     this.range = { ...range };
     this.scale = scale;
     this.updateColors();
+  }
+
+  /** Layer switches reuse geometry and percentile settings; model/ERA5 share one population. */
+  setPopulation(population: readonly number[]): void {
+    this.sequencePopulation = population;
+    this.resolve();
   }
 
   getColorScale(): ResolvedColorScale | null { return this.scale; }

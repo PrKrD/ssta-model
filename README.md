@@ -11,6 +11,13 @@ synthetic field playback. The Python model uses prescribed historical atmospheri
 variability. Saved SST can be exported offline to the Cesium viewer; stochastic
 forcing and live frontend communication are not implemented.
 
+The full January 1979–October 2026 experiment now initializes from ERA5 SST
+anomalies, integrates February onward, and compares with ERA5 using a 1979–2025
+monthly climatology. A shared-timeline 0.5° Cesium selector displays model, ERA5
+and their difference. See [comparison instructions](docs/era5_comparison.md) for
+definitions, diagnostics and launch commands. It is retrospective comparison,
+not independent forecast validation; the original zero-initialized pilot remains.
+
 ## Scientific scope
 
 The intended framework uses geographically varying but temporally fixed

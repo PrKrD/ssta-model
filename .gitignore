@@ -60,3 +60,4 @@ coverage/
 
 # Offline generated display datasets (small test fixtures live under tests)
 /frontend/public/data/*.json
+/frontend/public/data/era5_comparison/

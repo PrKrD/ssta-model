@@ -44,8 +44,8 @@ Sea surface salinity remains an optional extension.
   field viewer with static JSON model sequences and synthetic demo playback. Its validated data
   boundary separates fixed grid geometry from numerical values and metadata;
   rendering, picking and UI are separate.
-  The primary input is an offline 5° aggregate of saved pilot SST, validated
-  through the same sequence boundary as the explicitly labelled demo fallback.
+  The primary input is the offline 0.5° model/ERA5 comparison; the 5° pilot and
+  explicitly labelled demo remain available through their sequence boundary.
   No runtime NetCDF parser, Python server or API is involved. See the
   [frontend guide](../frontend/README.md) for the concrete data contract.
 
@@ -137,6 +137,26 @@ scientific results nor the solver; original raw data and PCs/regressions are not
 export dependencies. Historical source paths in provenance are never opened.
 The [frontend guide](../frontend/README.md) documents the display approximation,
 static loading, fixed sequence-wide colour scale and explicit synthetic fallback.
+
+## ERA5 historical comparison
+
+[data/era5.py](../src/ssta_model/data/era5.py) independently processes the newly
+supplied monthly SST into native-grid anomalies and twelve monthly climatologies.
+The original preprocessing workflow and compact atmospheric/MLD products remain
+unchanged. The existing runtime loader can initialize one observed month; core
+then integrates subsequent forcing months with no assimilation and unchanged
+NumPy numerical/physical kernels. Scalar initialization remains supported.
+
+[analysis/era5_comparison.py](../src/ssta_model/analysis/era5_comparison.py) owns
+paired native metrics, region series, sensitivity and scientific figures outside
+integration. [data/comparison_export.py](../src/ssta_model/data/comparison_export.py)
+creates ordinary static 0.5° monthly three-layer display files and one manifest.
+The frontend validates/fetches months on demand, retaining bounded buffers and
+reusing existing geometry/playback. Model and ERA5 share fixed colour limits;
+selecting model/ERA5/difference preserves the calendar month. Pilot/demo remain.
+There is no API or live connection. [Scientific conventions](era5_comparison.md)
+distinguish calendar labels, observed monthly means and model boundary states,
+and document the retrospective, non-independent nature of this comparison.
 
 ## Reproducibility and storage
 

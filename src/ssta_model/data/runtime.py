@@ -87,3 +87,26 @@ def load_hemisphere(directory, hemisphere, ocean):
         products["pcs"], products["regression"], products["surface"], ocean, hemisphere
     )
     return products
+
+
+def initial_temperature(surface, config, hemisphere):
+    """Load only the configured first observed month; no later observations enter the loop."""
+    valid = surface.input_valid.values == 1
+    if config.get("kind", "scalar") == "scalar":
+        return np.where(valid, config["temperature_anomaly_k"], np.nan).astype(
+            "f8"
+        ), valid
+    from pathlib import Path
+
+    with xr.open_dataset(
+        Path(config["directory"]) / f"{hemisphere}_era5_ssta.nc", engine="netcdf4"
+    ) as ds:
+        same_grid(ds, surface)
+        require(ds.sst_anomaly.attrs.get("units") == "K", "Initial SST anomaly units")
+        months = ds.time.values.astype("datetime64[M]")
+        indices = np.flatnonzero(months == np.datetime64(config["month"], "M"))
+        require(len(indices) == 1, "Initial ERA5 month missing or duplicated")
+        values = ds.sst_anomaly.isel(time=int(indices[0])).values.astype("f8")
+    valid = valid & np.isfinite(values)
+    require(valid.any(), "No observed initial cells")
+    return np.where(valid, values, np.nan), valid

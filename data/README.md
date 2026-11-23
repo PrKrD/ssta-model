@@ -168,3 +168,19 @@ modes and masks. Integration never opens raw spatial damping.
 Implementation is in [ssta_model.data](../src/ssta_model/data/), with a thin
 [entry script](../experiments/prepare_model_inputs.py). Controlled synthetic
 [tests](../tests/test_model_inputs.py) run without the ignored local datasets.
+
+## Newly supplied ERA5 SST
+
+The previous atmospheric/MLD/damping raw inputs remain deleted. The **new**
+`raw/78c42a1ddf5ba77c929fd589ff5d3c61.nc` contains monthly `sst` in K, January
+1940–October 2026 on the identical native 0.25° grid. No old file was restored.
+[era5.py](../src/ssta_model/data/era5.py) separately prepares January 1979–October
+2026 extratropical anomalies against 1979–2025 calendar-month climatologies,
+without detrending, smoothing or new ocean masks. `north_era5_ssta.nc` and
+`south_era5_ssta.nc` store float64 anomalies/climatology in K and sample counts;
+`era5_ssta_manifest.json` records source attributes, units, reference period,
+coordinate equality and checksums. These additions do not alter the seven
+original compact products or their manifest. Existing ERA5 products are protected
+from overwrite. See [definitions](../docs/era5_comparison.md) and
+[commands](../experiments/README.md#historical-era5-comparison). Analysis/export
+need no raw SST and do not call the original preparation pipeline.

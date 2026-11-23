@@ -31,6 +31,15 @@ def load_configuration(path, root=Path(".")):
     initial = config["initial_conditions"]["temperature_anomaly_k"]
     if type(initial) not in (int, float) or not np.isfinite(initial):
         raise ValueError("Initial anomaly must be finite")
+    initial_config = config["initial_conditions"]
+    if initial_config.get("kind", "scalar") == "era5":
+        if initial_config["month"] != config["experiment"]["start_month"]:
+            raise ValueError("ERA5 initial month must equal experiment start month")
+        initial_config["directory"] = str(
+            (root / initial_config.get("directory", "data/processed")).resolve()
+        )
+    elif initial_config.get("kind", "scalar") != "scalar":
+        raise ValueError("Unknown initial-condition kind")
     damping = config.setdefault("surface_damping", {})
     damping_path = root / damping.get("configuration", "configs/surface_damping.toml")
     with damping_path.open("rb") as stream:

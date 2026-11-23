@@ -2,8 +2,9 @@
 
 A framework-free TypeScript/Vite application using CesiumJS. It runs independently
 of the Python scientific package and the earlier `globetest` repository. Its
-primary dataset is the exported historical SST pilot when available; otherwise
-it explicitly displays the synthetic demonstration. No Python runtime, API,
+primary dataset is the full historical 0.5° model/ERA5 comparison when available.
+The prior pilot and labelled synthetic demonstration remain accessible.
+No Python runtime, API,
 ion token, remote imagery or model calculations run in the browser. WebGL is required.
 
 ## Run and check
@@ -26,8 +27,8 @@ the same cells. Reset restores p2–p98. Gray means missing data, not land.
 `npm run preview` serves the production build; a separate frontend CI job runs
 installation, build and tests without changing the Python checks.
 
-Both datasets start paused. **Play/Pause** controls looping playback; the timeline
-selects any monthly frame (24 pilot states or 120 demo frames) and shows its
+All datasets start paused. **Play/Pause** controls looping playback; the timeline
+selects any monthly frame (574 comparison states, 24 pilot states or 120 demo frames) and shows its
 month and frame number. **Model pilot / Synthetic demo** links switch datasets.
 **← / →** step one frame. Scrubbing and stepping pause playback; manual steps
 stop at the first/last frame, while playing wraps from the last to the first.
@@ -94,6 +95,43 @@ written under `runs/historical_surface_flux_pilot/visualization/`. See the
 [experiment guide](../experiments/README.md) for alternative input/output paths
 and regeneration after future simulations. Scientific limitations are in the
 [model guide](../docs/surface_flux_model.md).
+
+## Full historical ERA5 comparison
+
+The default viewer prefers `public/data/era5_comparison/manifest.json`. The
+**Dataset** selector switches Modelled SSTA, ERA5 SSTA and Difference (Model − ERA5)
+without changing the selected month. There are 574 calendar states: initialized
+January 1979, then February 1979–October 2026 integrations. January is excluded
+from skill statistics. Its initial field is assigned at 1 February; later model
+times remain exact interval ends. Calendar labels match model end states with
+ERA5 monthly means by the explicit experiment convention.
+
+Run `python experiments/compare_era5_sst.py --stage export` from the repository
+root after the new model run and processed SST exist. See
+[complete commands](../experiments/README.md#historical-era5-comparison) and
+[scientific definitions](../docs/era5_comparison.md). No deleted raw input is restored.
+Launch normally with `npm run dev`; export before `npm run build` for production.
+Use the navigation links or `?dataset=pilot` / `?dataset=demo` for older datasets.
+
+The scientific grid remains 0.25°. Display rectangles are 0.5° with paired finite
+model/ERA5 ocean values and native area weights. Binning follows the same edge,
+antimeridian and approximate coastal-rectangle conventions described for the
+pilot. Tooltips retain actual values in K, cell bounds/counts, selected dataset,
+calendar label and state timestamp. No smoothing or fabricated tropics are added.
+
+[comparison.ts](src/data/comparison.ts) validates a static manifest and one
+monthly three-layer binary file at a time. Files use little-endian float32;
+NaN becomes missing. At most three monthly buffers are cached. Later requests
+cannot replace a newer selection; a failed month pauses playback visibly.
+Missing comparison assets fall back explicitly to the prior pilot/demo.
+
+Model and ERA5 have identical fixed full-history display-colour populations;
+difference has its own symmetric population. Percentile controls use approximate
+deterministic rotating samples across the record, plus exact extrema. This
+affects colours only, never tooltip values. The old 5° pilot retains exact
+full-sequence percentiles. All generated comparison assets remain ignored by Git.
+The experiment is retrospective ERA5-related comparison, not independent forecast
+validation; see the scientific guide for limitations.
 
 ## Components and migration
 
@@ -168,7 +206,8 @@ outputs can use this boundary independently of their producer. The renderer does
 not read NetCDF or import Python. Values remain separate from colors, so display
 clipping never changes tooltip values.
 
-Percentiles exclude unavailable values. **The playback population contains every
+For in-memory pilot/demo sequences, percentiles exclude unavailable values.
+**The playback population contains every
 finite cell value across all frames**, with equal weight per valid cell/frame.
 It is sorted once at initialisation. Default p2–p98 limits therefore apply to the
 entire sequence, including when a particular frame has missing values or smaller

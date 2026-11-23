@@ -66,7 +66,7 @@ function coordinate(value: unknown, limit: number, label: string): number {
   return value;
 }
 
-function timestamp(value: unknown): string {
+export function timestamp(value: unknown): string {
   const result = text(value, "timestamp");
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(result) ||
       !Number.isFinite(Date.parse(result)) ||

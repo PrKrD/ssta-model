@@ -329,3 +329,82 @@ def test_configuration_overrides_invalid_values_and_input_checksums(experiment):
         ds["standardized_pc"][0, 0] = 999
     with pytest.raises(ValueError, match="checksum mismatch"):
         run_experiment(path, root)
+
+
+def test_observed_january_initialization_february_first_no_later_assimilation(
+    experiment,
+):
+    from ssta_model.analysis.era5_comparison import aligned_months
+
+    root, path, _, products = experiment
+    directory = root / "data/processed"
+    dates = np.arange("1979-01", "1979-04", dtype="datetime64[M]").astype(
+        "datetime64[ns]"
+    )
+    for h, (pcs, regression, surface) in products.items():
+        pcs = pcs.assign_coords(time=dates)
+        pcs.attrs.update(first_month="1979-01", last_month="1979-03")
+        regression.attrs.update(first_month="1979-01", last_month="1979-03")
+        pcs.to_netcdf(directory / f"{h}_pcs.nc", engine="netcdf4")
+        regression.to_netcdf(directory / f"{h}_regression.nc", engine="netcdf4")
+        values = np.full((3, 2, 4), 999.0)
+        values[0] = 2.0
+        flat = np.flatnonzero(surface.input_valid.values.ravel() == 1)[0]
+        values[0].flat[flat] = np.nan
+        era = xr.Dataset(
+            {"sst_anomaly": (("time", "latitude", "longitude"), values)},
+            coords={
+                "time": dates,
+                "latitude": surface.latitude,
+                "longitude": surface.longitude,
+            },
+        )
+        era.sst_anomaly.attrs["units"] = "K"
+        era.to_netcdf(directory / f"{h}_era5_ssta.nc", engine="netcdf4")
+    manifest = json.loads((directory / "manifest.json").read_text())
+    for record in manifest["products"]:
+        record["sha256"] = checksum(directory / record["filename"])
+    (directory / "manifest.json").write_text(json.dumps(manifest))
+    text = (
+        path.read_text()
+        .replace("1980-", "1979-")
+        .replace(
+            "temperature_anomaly_k=0.0",
+            'temperature_anomaly_k=0.0\nkind="era5"\nmonth="1979-01"',
+        )
+    )
+    path.write_text(text)
+    run_experiment(path, root)
+    for h, (pcs, _, surface) in products.items():
+        with (
+            xr.open_dataset(root / f"runs/test/{h}_sst.nc") as model,
+            xr.open_dataset(directory / f"{h}_era5_ssta.nc") as era,
+        ):
+            np.testing.assert_array_equal(model.forcing_month, ["1979-02", "1979-03"])
+            assert aligned_months(model, era) == [(0, 1, "1979-02"), (1, 2, "1979-03")]
+            assert model.sizes["time"] == 2
+            assert model.initial_time == "1979-02-01T00:00:00Z"
+            valid = model.input_valid.values == 1
+            assert valid.sum() == (surface.input_valid.values == 1).sum() - 1
+            np.testing.assert_array_equal(model.initial_sst_anomaly.values[valid], 2.0)
+            forcing = pcs.standardized_pc.values[1].sum()
+            expected = (2 + 28 * 86400 * forcing / (1025 * 3990 * 50)) / (
+                1 + 28 * 86400 * 16 / (1025 * 3990 * 50)
+            )
+            np.testing.assert_array_equal(
+                model.sst_anomaly.values[0][valid],
+                np.full(valid.sum(), expected).astype("f4"),
+            )
+            assert np.isnan(model.sst_anomaly.values[:, ~valid]).all()
+        with netCDF4.Dataset(directory / f"{h}_era5_ssta.nc", "a") as era:
+            era["sst_anomaly"][1:] = -99999
+    path.write_text(
+        text.replace('directory="runs/test"', 'directory="runs/observed_repeat"')
+    )
+    run_experiment(path, root)
+    for h in products:
+        with (
+            xr.open_dataset(root / f"runs/test/{h}_sst.nc") as first,
+            xr.open_dataset(root / f"runs/observed_repeat/{h}_sst.nc") as second,
+        ):
+            np.testing.assert_array_equal(first.sst_anomaly, second.sst_anomaly)

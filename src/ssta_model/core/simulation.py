@@ -16,7 +16,7 @@ from ssta_model.core.configuration import load_configuration
 from ssta_model.core.integration import backward_euler
 from ssta_model.data.model_inputs import extratropics, require, spherical_cell_areas
 from ssta_model.data.prepare import checksum
-from ssta_model.data.runtime import load_hemisphere
+from ssta_model.data.runtime import initial_temperature, load_hemisphere
 from ssta_model.forcing.historical import reconstruct_month
 from ssta_model.physics.surface_flux import heat_capacity, surface_tendency
 
@@ -70,6 +70,14 @@ def provenance(config_path, config):
         "experiment_config_sha256": checksum(config_path),
         "damping_config_sha256": checksum(config["surface_damping"]["configuration"]),
         "inputs": inputs,
+        "initialization_inputs": {
+            f"{h}_era5_ssta.nc": checksum(
+                Path(config["initial_conditions"]["directory"]) / f"{h}_era5_ssta.nc"
+            )
+            for h in ("north", "south")
+        }
+        if config["initial_conditions"].get("kind") == "era5"
+        else {},
         "preprocessing_manifest_sha256": checksum(manifest_path),
         "code_revision": revision,
         "working_tree_dirty": dirty,
@@ -87,7 +95,7 @@ def provenance(config_path, config):
     }, manifest_path
 
 
-def create_output(path, surface, valid, area, config, metadata):
+def create_output(path, surface, valid, area, config, metadata, initial=None):
     """Create compressed, monthly chunked output; caller closes even after failure."""
     output = netCDF4.Dataset(path, "w", format="NETCDF4", clobber=False)
     try:
@@ -127,6 +135,11 @@ def create_output(path, surface, valid, area, config, metadata):
             surface.H.values
         )
         output["H"].setncatts(surface.H.attrs)
+        if initial is not None:
+            output.createVariable(
+                "initial_sst_anomaly", "f8", dims, fill_value=np.nan, **options
+            )[:] = initial
+            output["initial_sst_anomaly"].units = "K"
         output.createVariable("cell_area", "f8", dims, **options)[:] = area.values
         output["cell_area"].setncatts(area.attrs)
         sst = output.createVariable(
@@ -159,6 +172,26 @@ def create_output(path, surface, valid, area, config, metadata):
                 "initial_time": config["experiment"]["start_month"] + "-01T00:00:00Z",
             }
         )
+        output.initial_condition_kind = config["initial_conditions"].get(
+            "kind", "scalar"
+        )
+        if output.initial_condition_kind == "era5":
+            output.delncattr("initial_temperature_anomaly_k")
+            output.initial_month = config["initial_conditions"]["month"]
+            output.initial_time = (
+                str(
+                    (np.datetime64(output.initial_month, "M") + 1).astype(
+                        "datetime64[s]"
+                    )
+                )
+                + "Z"
+            )
+            output.initialization_definition = "January monthly ERA5 anomaly assigned at the February integration start boundary; initial month excluded from skill"
+            output[
+                "input_valid"
+            ].definition += (
+                "; observed-initialised run also requires finite initial ERA5 SSTA"
+            )
         return output
     except BaseException:
         output.close()
@@ -170,6 +203,15 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
     months, starts, ends, durations = month_intervals(
         config["experiment"]["start_month"], config["experiment"]["end_month"]
     )
+    observed = config["initial_conditions"].get("kind") == "era5"
+    if observed:
+        months, starts, ends, durations = (
+            a[1:] for a in (months, starts, ends, durations)
+        )
+        require(
+            len(months) > 0,
+            "Observed initialisation needs a subsequent integrated month",
+        )
     pcs, surface = products["pcs"], products["surface"]
     pc_months = pcs.time.values.astype("datetime64[M]")
     positions = np.searchsorted(pc_months, months)
@@ -178,12 +220,11 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
         np.array_equal(pc_months[positions], months),
         "Requested forcing months unavailable",
     )
-    valid = surface.input_valid.values == 1
+    temperature, valid = initial_temperature(
+        surface, config["initial_conditions"], hemisphere
+    )
     depth = surface.H.values.astype("f8")
     beta = products["regression"].coefficient.values
-    temperature = np.where(
-        valid, config["initial_conditions"]["temperature_anomaly_k"], np.nan
-    ).astype("f8")
     rho, cp = (config["parameters"][k] for k in ("rho_kg_m3", "cp_j_kg_k"))
     gamma = (
         config["surface_damping"]["gamma_w_m2_k"]
@@ -194,7 +235,9 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
     weights = area.values[valid]
     rows = []
     path = output_dir / f"{hemisphere}_sst.nc"
-    with create_output(path, surface, valid, area, config, metadata) as output:
+    with create_output(
+        path, surface, valid, area, config, metadata, temperature
+    ) as output:
         for index, (month, start, end, dt, position) in enumerate(
             zip(months, starts, ends, durations, positions)
         ):
@@ -268,6 +311,10 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
         writer.writerows(rows)
     return {
         "active_cells": int(valid.sum()),
+        "first_integrated_month": str(months[0]),
+        "initialization_month": config["initial_conditions"].get("month")
+        if observed
+        else None,
         "monthly_steps": len(rows),
         "minimum_k": min(r["minimum_k"] for r in rows),
         "maximum_k": max(r["maximum_k"] for r in rows),

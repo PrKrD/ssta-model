@@ -51,3 +51,18 @@ See the [export command](../experiments/README.md#offline-sst-visualization-expo
 
 Track [experiment definitions](../experiments/) and
 [configurations](../configs/) separately from generated results.
+
+## ERA5-initialised historical comparison
+
+`historical_surface_flux_era5_initialised/` preserves the earlier pilot separately.
+Its 573 integrations cover February 1979–October 2026; January's observed initial
+field is saved separately as `initial_sst_anomaly`, assigned to the February start
+boundary and excluded from skill. Later ERA5 observations never enter dynamics.
+
+`comparison/` holds hemispheric/regional CSVs, full-period and post-24-calendar-month
+summaries, native temporal-variability NetCDF and five PNG figures: geographical
+model/ERA5/difference, hemispheric means, temporal variability, pattern correlation
+and regional series. `display_export_report.json` records the 0.5° export checks.
+All generated products remain ignored. See [scientific conventions](../docs/era5_comparison.md)
+and [execution](../experiments/README.md#historical-era5-comparison). This is
+retrospective comparison of ERA5-related products, not independent prediction validation.

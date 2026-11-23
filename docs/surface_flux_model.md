@@ -4,6 +4,12 @@ This first model integrates independent extratropical ocean cells using
 historically prescribed atmospheric variability. It is not a stochastic
 simulation and has not been validated against observed SST.
 
+The separate [ERA5 retrospective comparison](era5_comparison.md) now evaluates
+the historical response against monthly reference anomalies, with observed
+January initialization and unchanged physics. This does not establish independent
+forecast skill or validate the provisional feedback coefficient. The original
+zero-initialized 24-month experiment described below remains available.
+
 ## Equations and units
 
 For SST anomaly T (K), prescribed downward heat-flux anomaly F (W m⁻²), fixed

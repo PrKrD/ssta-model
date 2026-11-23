@@ -74,3 +74,35 @@ default loader, keep the default JSON destination. Start the viewer with
 `cd frontend` then `npm run dev`; build after exporting if using production
 preview. See [frontend instructions](../frontend/README.md) for binning, masks,
 time labels, coastline approximations and the selectable synthetic fallback.
+
+## Historical ERA5 comparison
+
+Install plotting support with `python -m pip install -e ".[dev,visualization]"`.
+On fresh outputs, run from the repository root:
+
+```sh
+python experiments/compare_era5_sst.py --stage prepare --source data/raw/78c42a1ddf5ba77c929fd589ff5d3c61.nc
+python experiments/compare_era5_sst.py --stage run
+python experiments/compare_era5_sst.py --stage analyse
+python experiments/compare_era5_sst.py --stage export
+```
+
+`--stage all` runs the same sequence. Preparation refuses existing ERA5 products;
+integration refuses an existing run directory. Do not repeat these stages when
+only regenerating diagnostics/display: `analyse` and `export` use existing
+scientific outputs and do not read raw SST. Deleted old raw files and the old
+preparation pipeline are never required.
+
+The [configuration](../configs/historical_surface_flux_era5_initialised.toml)
+initializes January 1979 ERA5 SSTA, then integrates February 1979–October 2026.
+The [comparison guide](../docs/era5_comparison.md) specifies the source,
+1979–2025 monthly climatology, masks, timestamps, metrics, regional bounds and
+spin-up sensitivity. Outputs go to `runs/historical_surface_flux_era5_initialised/`;
+its `comparison/` contains CSVs, summary, native variability and five figures.
+
+The ignored static 0.5° assets are under `frontend/public/data/era5_comparison/`.
+Export before production builds. Launch with `cd frontend` then `npm run dev`;
+comparison loads by default. Its selector preserves the month while switching
+Modelled SSTA / ERA5 SSTA / Model−ERA5. `?dataset=pilot` and `?dataset=demo`
+retain the earlier datasets. This is retrospective comparison, not independent
+forecast validation. No parameter or scientific resolution changes are made.
