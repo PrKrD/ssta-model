@@ -5,6 +5,11 @@ The original seven supplied NetCDF files were deliberately removed after
 preparation to save disk space. Existing processed products and saved model
 outputs remain usable. Do not restore raw files or rerun preparation for
 [visualization](../frontend/README.md).
+The MLD source has since been reuploaded as `raw/mld_dr003_ref10m_v2023.nc` for
+the isolated [H/mask rebuild comparison](../docs/h_rebuild.md); no other original
+input is restored or required. Proposed `north_surface_h_bilinear.nc`,
+`south_surface_h_bilinear.nc` and `mld_mask_remapped.nc` under `processed/` are
+separate from the preserved baseline and are not selected by the scientific model.
 The preparation documentation below records the original workflow; its
 regeneration command requires separately available originals.
 During preparation, the seven files used their original names under `raw/`.

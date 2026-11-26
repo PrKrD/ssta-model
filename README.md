@@ -12,6 +12,10 @@ viewer selects SST with diffusion, without diffusion, ERA5, their differences,
 and static mixed-layer depth. It has no Python server or API. Obsolete synthetic
 and 24-month demonstrations have been retired.
 
+A separate [H/mask rebuild comparison](docs/h_rebuild.md) uses the reuploaded MLD
+source and the old mask-aware bilinear method. It produces proposed fields and
+static diagnostics only; the selected H, ERA5 mask and historical runs are unchanged.
+
 ## Development and execution
 
 Use Python 3.11+ and Node.js 22+:

@@ -24,6 +24,9 @@ solver registry is introduced.
   configured observed initial month. `era5.py` independently prepares monthly
   SST climatology/anomalies; this is outside integration. Original atmospheric,
   damping and MLD preparation remains separate and is not rerun.
+  `mld_rebuild.py` is a separate, explicitly invoked preparation workflow for
+  proposed bilinear H and remapped source-mask comparisons. It preserves selected
+  runtime products and never integrates SST; see [H rebuild](h_rebuild.md).
 - [analysis](../src/ssta_model/analysis/) owns paired ERA5 metrics, regional series,
   native scientific figures, and the controlled with/without-diffusion comparison.
   Model and ERA5 comparisons use common finite ocean support. Analysis does not

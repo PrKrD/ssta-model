@@ -8,6 +8,9 @@ experiment; the runner refuses existing output directories. No run manager exist
 - `historical_surface_flux_with_diffusion/`: separate experiment with conservative
   kappa=1000 m2 s-1 diffusion and otherwise identical inputs/masks/initialization.
 - `historical_surface_flux_diffusion_check/`: short actual-data solve verification.
+- `h_rebuild_comparison/`: preparation-only H/mask statistics, four static
+  comparison figures and preservation/provenance report. No historical rerun;
+  proposed processed H remains separate. See [H comparison](../docs/h_rebuild.md).
 
 Each historical run stores separate north/south compressed NetCDF with
 `sst_anomaly(time,latitude,longitude)` (K), original coordinates, fixed H, native

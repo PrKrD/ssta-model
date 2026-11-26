@@ -5,6 +5,15 @@ configurations, write generated outputs to `runs/`, and preserve the full
 no-diffusion baseline under `runs/historical_surface_flux_era5_initialised/`.
 The synthetic and completed 1979–1980 demonstrations have been retired.
 
+## Proposed H rebuild (no SST integration)
+
+`python experiments/rebuild_h_field.py` uses only the reuploaded local MLD file
+and current processed grid/baseline fields. It saves separate proposed bilinear
+H, remaps the original source mask by spherical overlap, compares it explicitly
+with ERA5, and writes static figures/report under `runs/h_rebuild_comparison/`.
+Install the existing `visualization` extra. No model rerun or selected-input
+replacement occurs. See [methods, output paths and reproduction](../docs/h_rebuild.md).
+
 ## Diffusion experiment
 
 Install dependencies and verify the operator before running:
