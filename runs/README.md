@@ -1,68 +1,40 @@
-# Generated runs
+# Generated scientific outputs
 
-Write generated simulations, diagnostics, plots, logs and results here. Everything
-except this README is ignored by Git. Use a separate directory per run to avoid
-overwriting results. The historical surface-flux experiment refuses existing
-output directories, including partial runs. There is no run manager.
+All contents except this README are ignored by Git. Use a separate directory per
+experiment; the runner refuses existing output directories. No run manager exists.
 
-Each completed historical run contains:
+- `historical_surface_flux_era5_initialised/`: preserved February 1979–October
+  2026 no-diffusion baseline, initialized from January ERA5 SSTA.
+- `historical_surface_flux_with_diffusion/`: separate experiment with conservative
+  kappa=1000 m2 s-1 diffusion and otherwise identical inputs/masks/initialization.
+- `historical_surface_flux_diffusion_check/`: short actual-data solve verification.
 
-- `north_sst.nc` and `south_sst.nc`: compressed NetCDF4 SST, coordinates,
-  `time_bounds`, `forcing_month`, `input_valid`, fixed H and cell areas. SST
-  chunks are one month × up to 64 latitude × 240 longitude cells. Float32
-  storage is checked against float64 integration each month. Invalid SST is NaN.
-- `north_monthly.csv` and `south_monthly.csv`: area-weighted SST mean, unweighted
-  spatial standard deviation/quantiles/extrema, non-finite count, heat-budget
-  residual and storage error for each post-integration monthly state.
-- `configuration.json`, `provenance.json` and `preprocessing_manifest.json`:
-  resolved settings, input/configuration/source SHA-256 hashes, code revision and
-  dirty flag, software versions and copied preprocessing provenance. NetCDF
-  attributes also embed configuration and run provenance.
-- `summary.json`: completion/failure status, runtime, cell counts, statistics
-  for each month, final spatial standard deviations, full-run extrema, maximum
-  residual/rounding errors, and output file sizes/checksums. Failed runs retain
-  their partial outputs; only a `complete` status denotes success.
+Each historical run stores separate north/south compressed NetCDF with
+`sst_anomaly(time,latitude,longitude)` (K), original coordinates, fixed H, native
+areas, active mask, exact state times/bounds, and forcing-month labels. Initial
+January is stored separately as `initial_sst_anomaly`, assigned at 1 February.
+Later observations do not enter dynamics. Invalid cells stay NaN. Float64 state
+is retained during integration; saved float32 SST is checked before proceeding.
 
-`time` is the exact UTC interval-end boundary, not a monthly average. For
-January forcing the saved boundary is 1 February; `forcing_month` and bounds
-identify January explicitly. Do not compare boundary states with observed
-monthly means without accounting for this convention. Numerical residuals are
-computed before output rounding, and do not measure observational agreement.
-No full-resolution forcing cube is saved.
+Configuration, source hashes, preprocessing provenance, code revision/dirty flag,
+library versions and numerical method are recorded. Monthly CSV/JSON diagnostics
+include extrema, quantiles, means, spatial SD, budget residual, CG iterations and
+relative residual. A failed solve aborts and marks a partial run failed; only
+`status=complete` denotes completion. Polar residuals refer to the independent
+cap volume, whose values are expanded onto the original native grid.
 
-See the [experiment instructions](../experiments/README.md) and
-[scientific assumptions](../docs/surface_flux_model.md). Future stochastic runs
-must additionally record seeds and random-generator details.
+`comparison/` contains ERA5 monthly/regional statistics, temporal variability,
+controlled diffusion effects, summary JSON, native H/SST comparison figures and
+regional/hemispheric time series. Directly comparable maps share colour limits.
+The display export report records source identities, aggregate checks and asset
+sizes. Static H comes directly from existing processed fields; it is not animated.
 
-## Generated visualization diagnostics
+The default display uses generated 0.5-degree files under
+`frontend/public/data/era5_comparison/`, separate from the 0.25-degree science.
+The retired demonstration directories and matching display JSON were positively
+identified and deleted; `runs/retired_demo_assets.json` records checks and sizes.
+No full historical run or processed input was deleted.
 
-The offline exporter adds `visualization/export_report.json` and
-`visualization/export_report.md` under the selected run, plus the native 0.25°
-diagnostic `native_sst_1980-05.png` by default. The map reads saved SST directly,
-with longitude/latitude axes, symmetric zero-centred colours in K, and gray
-missing regions. It is independent of 5° display aggregation. It labels May's
-post-integration state at 1 June 1980 UTC, not a monthly mean.
-
-The JSON display asset is generated separately under `frontend/public/data/`
-and remains ignored. Native NetCDF outputs and source provenance are preserved.
-The export reports record their SHA-256 identities, tile/frame counts, asset
-size, null count and independent sampled area-weighted aggregation errors.
-See the [export command](../experiments/README.md#offline-sst-visualization-export).
-
-Track [experiment definitions](../experiments/) and
-[configurations](../configs/) separately from generated results.
-
-## ERA5-initialised historical comparison
-
-`historical_surface_flux_era5_initialised/` preserves the earlier pilot separately.
-Its 573 integrations cover February 1979–October 2026; January's observed initial
-field is saved separately as `initial_sst_anomaly`, assigned to the February start
-boundary and excluded from skill. Later ERA5 observations never enter dynamics.
-
-`comparison/` holds hemispheric/regional CSVs, full-period and post-24-calendar-month
-summaries, native temporal-variability NetCDF and five PNG figures: geographical
-model/ERA5/difference, hemispheric means, temporal variability, pattern correlation
-and regional series. `display_export_report.json` records the 0.5° export checks.
-All generated products remain ignored. See [scientific conventions](../docs/era5_comparison.md)
-and [execution](../experiments/README.md#historical-era5-comparison). This is
-retrospective comparison of ERA5-related products, not independent prediction validation.
+See [commands](../experiments/README.md), [finite volumes and H provenance](../docs/surface_flux_model.md),
+[comparison definitions](../docs/era5_comparison.md) and [viewer](../frontend/README.md).
+This is retrospective comparison, not independent prediction validation.

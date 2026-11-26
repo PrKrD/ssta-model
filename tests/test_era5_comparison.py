@@ -13,6 +13,7 @@ from ssta_model.analysis.era5_comparison import (
     region_mask,
 )
 from ssta_model.data.comparison_export import aggregate_pair, comparison_bins
+from ssta_model.data.diffusion_export import aggregate_fields
 from ssta_model.data.era5 import inspect_sst, monthly_anomalies, prepare_era5
 
 
@@ -152,3 +153,25 @@ def test_half_degree_coordinates_partial_ocean_and_common_support_difference():
     )
     region = region_mask(grid, ("north", 20, 65, 120, -100))
     np.testing.assert_array_equal(region, [[True, True, True, True, False]] * 2)
+
+
+def test_three_way_display_support_and_independent_static_depth():
+    bins = np.array([[0, 0, 1, 2]])
+    area = np.array([[1.0, 3.0, 2.0, 4.0]])
+    valid = np.array([[True, True, True, False]])
+    with_diffusion = np.array([[1.0, 5.0, 7.0, 100.0]])
+    baseline = np.array([[2.0, 6.0, np.nan, 100.0]])
+    era5 = np.array([[0.0, 2.0, 9.0, 100.0]])
+    means = aggregate_fields([with_diffusion, baseline, era5], area, valid, bins)
+    np.testing.assert_allclose(means[:, 0], [4.0, 5.0, 1.5])
+    assert np.isnan(means[:, 1:]).all()
+    np.testing.assert_allclose(means[0, 0] - means[1:, 0], [-1.0, 2.5])
+
+    # H remains available where a monthly SST comparison has no common support.
+    depth = np.array([[10.0, 30.0, 50.0, np.nan]])
+    depth_valid = np.isfinite(depth) & (depth > 0)
+    static = aggregate_fields([depth], area, depth_valid, bins)
+    np.testing.assert_allclose(static[0, :2], [25.0, 50.0])
+    assert np.isnan(static[0, 2:]).all()
+    with pytest.raises(ValueError, match="display areas"):
+        aggregate_fields([depth], -area, depth_valid, bins)

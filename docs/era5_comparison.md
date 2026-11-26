@@ -37,7 +37,7 @@ and the original preparation pipeline is not invoked.
 field enters the dynamics. The run mask intersects the original model mask with
 finite January SSTA; missing initial cells remain inactive permanently. Later
 observations never replace or nudge the model state. Scalar/zero initialization
-remains available for the original pilot and other configurations.
+remains available for controlled experiments.
 
 The January mean anomaly is assigned to the **1 February 1979** boundary before
 February forcing begins, by modelling convention. It is saved separately as
@@ -52,12 +52,14 @@ Comparison deliberately matches model forcing/calendar labels to ERA5 monthly
 means bearing those labels. Boundary states and monthly means are not identical;
 no extra monthly-mean approximation or timestamp correction is implemented.
 
-The governing equation, independent ordered 12-mode hemispheric forcing, raw
-turbulent coefficients, fixed H and backward Euler are unchanged. Parameters
+The no-diffusion baseline retains its governing equation, independent ordered
+12-mode hemispheric forcing, raw turbulent coefficients, fixed H and backward
+Euler. Parameters
 remain ρ=1025 kg m⁻³, cₚ=3990 J kg⁻¹ K⁻¹; γ comes from the unchanged
 [baseline](../configs/surface_damping.toml). No recalibration, intercept,
-feedback correction, new forcing or transport is introduced. The earlier pilot
-and original seven processed products are preserved.
+feedback correction, new forcing or transport is introduced in that baseline.
+The original seven processed products are preserved. The full historical run is
+retained for the controlled diffusion comparison below.
 
 ## Native comparison diagnostics
 
@@ -93,30 +95,33 @@ native panels, shared model/ERA5 limits), `hemispheric_means.png`,
 and `regional_time_series.png`. CSVs and JSON preserve all monthly diagnostics
 and both sensitivity summaries.
 
-## Half-degree static display
+## Controlled diffusion comparison and half-degree display
 
-[Export](../src/ssta_model/data/comparison_export.py) uses fixed 0.5° centre bins
-and saved native areas. Both datasets use the **same finite native ocean support**
-in each tile/month. Empty tiles are omitted; unavailable paired values stay
-missing. Longitude wraps to [−180,180); rectangles never cross the antimeridian.
-Half-open edges select the northern/eastern tile; +90° and the southern −20°
-boundary are closed into the final domain tile. Native 0.25° fields are unchanged.
-Coastal rectangles represent valid ocean area, not an exact coastline.
+The new [diffusion experiment](surface_flux_model.md) adds only conservative
+horizontal diffusion with kappa=1000 m2 s-1. Forcing, damping, fixed H, initial
+fields, masks and month labels match the preserved baseline. Both models are
+compared with ERA5 using the same finite support and metric definitions above.
+Monthly diffusion-minus-baseline statistics isolate the process effect, including
+changes in spatial variance. Improvements or degradations are reported without
+retuning parameters.
 
-An ordinary static manifest stores one grid/timeline. Each monthly file contains
-three little-endian float32 arrays (model, ERA5, difference; NaN missing), checked
-against float64 aggregates. The viewer keeps at most three monthly buffers,
-validates fields, discards stale asynchronous responses and reuses existing
-geometry, playback, picking and controls. Failed loads pause playback visibly.
-Switching datasets preserves the selected month. Pilot/demo links remain.
+[data/diffusion_export.py](../src/ssta_model/data/diffusion_export.py) produces
+five monthly SST fields (with diffusion, without, ERA5, with-minus-ERA5,
+with-minus-without) and a separate static H array. All three SST datasets use
+common finite native ocean support and area weights. H uses finite positive
+processed depths independently, so H-only coastal tiles have missing SST.
+One fixed 0.5-degree geometry and monthly static files keep browser memory
+bounded; the numerical grid is unchanged at 0.25 degrees. Centre bins use
+half-open north/east edges, periodic longitude, and closed southern -20-degree
+and polar endpoints. Coastal rectangles remain an approximation.
 
-Model and ERA5 share one fixed colour population; difference has its own symmetric
-population. Display percentiles are approximate rotating samples across all
-months (every 1024th finite aggregate, offset changes by month), with exact extrema
-included. This affects colours only; tooltip values are actual aggregates, never
-clipped or fitted. Sampling is disclosed in the viewer/manifest. The old 5° pilot
-retains exact full-sequence percentiles. No Python server or runtime NetCDF parser
-is introduced. See [commands](../experiments/README.md#historical-era5-comparison).
+All directly comparable SST layers share one fixed sampled colour population.
+The two differences have separate symmetric populations. H uses every finite
+display value, a sequential palette in metres, and pauses playback without losing
+the selected month. Numerical values are never clipped or fitted to improve
+appearance. Demonstration routes and completed 24-month outputs have been
+retired. See [viewer usage](../frontend/README.md) and
+[execution](../experiments/README.md).
 
 ## Interpretation limits
 

@@ -9,6 +9,7 @@ export class PlaybackControls {
   private timeline: HTMLInputElement;
   private time: HTMLOutputElement;
   private speed: HTMLSelectElement;
+  private disabled = false;
 
   constructor(
     element: HTMLElement, private frameCount: number,
@@ -52,10 +53,17 @@ export class PlaybackControls {
     this.timeline.value = String(state.index);
     this.timeline.setAttribute("aria-valuetext", `${timeLabel ?? timestamp}, frame ${state.index + 1} of ${this.frameCount}`);
     this.time.textContent = `${timeLabel ?? timestamp.slice(0, 7)} · ${state.index + 1}/${this.frameCount}`;
-    this.previous.disabled = state.index === 0;
-    this.next.disabled = state.index === this.frameCount - 1;
+    this.previous.disabled = this.disabled || state.index === 0;
+    this.next.disabled = this.disabled || state.index === this.frameCount - 1;
     this.speed.value = String(state.speed);
   }
 
   destroy(): void { this.events.abort(); }
+
+  setDisabled(disabled: boolean, state: PlaybackState): void {
+    this.disabled = disabled;
+    this.play.disabled = this.timeline.disabled = this.speed.disabled = disabled;
+    this.previous.disabled = disabled || state.index === 0;
+    this.next.disabled = disabled || state.index === this.frameCount - 1;
+  }
 }

@@ -13,11 +13,13 @@ import numpy as np
 import xarray as xr
 
 from ssta_model.core.configuration import load_configuration
+from ssta_model.core.diffusion import DiffusionStepper
 from ssta_model.core.integration import backward_euler
 from ssta_model.data.model_inputs import extratropics, require, spherical_cell_areas
 from ssta_model.data.prepare import checksum
 from ssta_model.data.runtime import initial_temperature, load_hemisphere
 from ssta_model.forcing.historical import reconstruct_month
+from ssta_model.physics.horizontal_diffusion import build_diffusion
 from ssta_model.physics.surface_flux import heat_capacity, surface_tendency
 
 
@@ -86,10 +88,16 @@ def provenance(config_path, config):
             "python": platform.python_version(),
             **{
                 name: importlib.metadata.version(name)
-                for name in ("numpy", "xarray", "netCDF4")
+                for name in ("numpy", "xarray", "netCDF4", "scipy")
             },
         },
-        "method": "Backward Euler; monthly piecewise-constant prescribed forcing; float64 state",
+        "method": "Backward Euler; monthly piecewise-constant prescribed forcing; float64 state; optional conservative spherical finite-volume diffusion with CG and longitude-line preconditioning",
+        "diffusion": {
+            "enabled": config["physics"].get("horizontal_diffusion", False),
+            "kappa_m2_s": config["parameters"].get("kappa_m2_s", 0),
+            "solver": config.get("solver", {}),
+            "boundary_policy": "Active shared faces only; periodic longitude; no flux at missing/land/tropical edges; fully active polar row is one heat-capacity-weighted cap DOF",
+        },
         "time_convention": "UTC interval-end state, not monthly mean; forcing_month and time_bounds identify forcing interval",
         "limitations": "Raw turbulent regression proxy, not observed net heat flux; provisional uniform damping; no feedback correction, sea-ice physics or observed SST validation; fixed maximum-monthly-climatology H",
     }, manifest_path
@@ -175,6 +183,14 @@ def create_output(path, surface, valid, area, config, metadata, initial=None):
         output.initial_condition_kind = config["initial_conditions"].get(
             "kind", "scalar"
         )
+        if (
+            config["physics"].get("horizontal_diffusion", False)
+            and config["parameters"].get("kappa_m2_s", 0) > 0
+        ):
+            output.equation = (
+                "rho*cp*H*dTheta/dt = F - gamma*Theta + rho*cp*div(kappa*H*grad(Theta))"
+            )
+            output.numerical_method = "Implicit conservative spherical finite volume; harmonic face depth; CG; longitude-line block Jacobi; active pole collapsed to cap DOF"
         if output.initial_condition_kind == "era5":
             output.delncattr("initial_temperature_anomaly_k")
             output.initial_month = config["initial_conditions"]["month"]
@@ -233,6 +249,22 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
     )
     capacity = heat_capacity(depth[valid], rho, cp)
     weights = area.values[valid]
+    diffusion = None
+    if (
+        config["physics"].get("horizontal_diffusion", False)
+        and config["parameters"].get("kappa_m2_s", 0) > 0
+    ):
+        geometry = build_diffusion(
+            surface.latitude.values,
+            surface.longitude.values,
+            area.values,
+            depth,
+            valid,
+            config["parameters"]["kappa_m2_s"],
+        )
+        diffusion = DiffusionStepper(
+            geometry, depth, area.values, rho, cp, gamma, **config.get("solver", {})
+        )
     rows = []
     path = output_dir / f"{hemisphere}_sst.nc"
     with create_output(
@@ -246,20 +278,29 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
                 if config["physics"]["surface_forcing"]
                 else np.zeros(valid.shape, dtype="f8")
             )
-            new = backward_euler(temperature, forcing, depth, valid, dt, rho, cp, gamma)
-            # Check in flux units (W m-2), using the unrounded float64 state.
-            residual = capacity * (
-                (new[valid] - temperature[valid]) / dt
-                - surface_tendency(new[valid], forcing[valid], capacity, gamma)
-            )
-            maximum_residual = float(np.max(abs(residual)))
+            if diffusion is not None:
+                new, solver_diagnostics = diffusion.step(temperature, forcing, dt)
+                maximum_residual = solver_diagnostics["maximum_budget_residual_w_m2"]
+            else:
+                new = backward_euler(
+                    temperature, forcing, depth, valid, dt, rho, cp, gamma
+                )
+                residual = capacity * (
+                    (new[valid] - temperature[valid]) / dt
+                    - surface_tendency(new[valid], forcing[valid], capacity, gamma)
+                )
+                maximum_residual = float(np.max(abs(residual)))
+                solver_diagnostics = {
+                    "solver_iterations": 0,
+                    "solver_relative_residual": 0.0,
+                }
             scale = max(
                 1.0,
                 float(np.max(abs(forcing[valid]))),
                 float(np.max(abs(gamma * new[valid]))),
             )
             require(
-                maximum_residual <= 1e-10 * scale,
+                diffusion is not None or maximum_residual <= 1e-10 * scale,
                 "Discrete heat-budget residual exceeds tolerance",
             )
             output["time"][index] = end.astype(np.int64)
@@ -302,9 +343,18 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
                     "active_nonfinite": int((~np.isfinite(values)).sum()),
                     "maximum_budget_residual_w_m2": maximum_residual,
                     "maximum_output_error_k": error,
+                    "solver_iterations": solver_diagnostics["solver_iterations"],
+                    "solver_relative_residual": solver_diagnostics[
+                        "solver_relative_residual"
+                    ],
                 }
             )
             temperature = new
+            if diffusion is not None and (index + 1) % 60 == 0:
+                print(
+                    f"{hemisphere}: {index + 1}/{len(months)} diffusion steps; last CG iterations={solver_diagnostics['solver_iterations']}",
+                    flush=True,
+                )
     with (output_dir / f"{hemisphere}_monthly.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
@@ -316,6 +366,16 @@ def run_hemisphere(products, hemisphere, area, config, metadata, output_dir):
         if observed
         else None,
         "monthly_steps": len(rows),
+        "diffusion_dofs": len(diffusion.geometry.mass)
+        if diffusion
+        else int(valid.sum()),
+        "maximum_solver_iterations": max(r["solver_iterations"] for r in rows),
+        "mean_solver_iterations": float(
+            np.mean([r["solver_iterations"] for r in rows])
+        ),
+        "maximum_solver_relative_residual": max(
+            r["solver_relative_residual"] for r in rows
+        ),
         "minimum_k": min(r["minimum_k"] for r in rows),
         "maximum_k": max(r["maximum_k"] for r in rows),
         "final_spatial_std_k": rows[-1]["spatial_std_k"],

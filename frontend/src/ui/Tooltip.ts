@@ -12,7 +12,7 @@ export class Tooltip {
       `Latitude bounds: ${cell.south}° to ${cell.north}°`,
       `Longitude bounds: ${cell.west}° to ${cell.east}°`,
       `${field.name}: ${value === null ? "Missing data" : `${value.toPrecision(5)} ${field.units}`}`,
-      ...(cell.nativeCellCount !== undefined ? [`Spatial aggregate · ${cell.nativeCellCount} native model cells in tile (finite values only)`] : []),
+      ...(cell.nativeCellCount !== undefined ? [`Spatial aggregate · ${cell.nativeCellCount} native H-grid cells in tile; only finite supported values contribute`] : []),
       ...(field.timeLabel ? [field.timeLabel] : []),
       ...(field.timestamp ? [`State timestamp: ${field.timestamp}`] : []),
     ].join("\n");

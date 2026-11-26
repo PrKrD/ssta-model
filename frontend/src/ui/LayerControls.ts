@@ -7,7 +7,7 @@ export class LayerControls {
   private events = new AbortController();
 
   constructor(
-    element: HTMLElement,
+    private element: HTMLElement,
     initialType: ColorScaleType,
     onChange: (type: ColorScaleType, range: PercentileRange) => void,
   ) {
@@ -53,4 +53,11 @@ export class LayerControls {
   }
 
   destroy(): void { this.events.abort(); }
+
+  setType(type: ColorScaleType, locked = false): void {
+    const select = this.element.querySelector("select")!;
+    select.value = type;
+    select.disabled = locked;
+    select.dispatchEvent(new Event("change"));
+  }
 }

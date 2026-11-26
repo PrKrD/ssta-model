@@ -1,9 +1,11 @@
 import { timestamp, validateField, validateGrid } from "./field";
 import type { GridGeometry, NumericalField } from "./field";
 
-export type ComparisonLayer = "model" | "era5" | "difference";
+export type ComparisonLayer = "with_diffusion" | "baseline" | "era5" | "difference" | "effect" | "depth";
 export const layerNames: Record<ComparisonLayer, string> = {
-  model: "Modelled SSTA", era5: "ERA5 SSTA", difference: "Difference (Model − ERA5)",
+  with_diffusion: "Model SSTA — With diffusion", baseline: "Model SSTA — Without diffusion",
+  era5: "ERA5 SSTA", difference: "Model with diffusion − ERA5",
+  effect: "Diffusion effect — With minus without", depth: "Mixed-layer depth H — Static",
 };
 interface Manifest {
   grid: GridGeometry;
@@ -11,14 +13,16 @@ interface Manifest {
   timestamps: string[];
   frameLabels: string[];
   frames: { file: string }[];
-  populations: { sst: number[]; difference: number[] };
+  populations: { sst: number[]; difference: number[]; effect: number[]; depth: number[] };
+  staticDepth: { file: string };
+  depthDescription: string;
   description: string;
 }
 
 export function validateComparison(input: unknown): Manifest {
   if (!input || typeof input !== "object") throw new Error("Missing comparison manifest");
   const m = input as Manifest & { format: string };
-  if (m.format !== "sst-comparison-f32-v1") throw new Error("Unknown comparison format");
+  if (m.format !== "sst-comparison-f32-v2") throw new Error("Unknown comparison format; regenerate the diffusion comparison assets");
   const grid = validateGrid(m.grid);
   if (grid.cells.some(c => c.east-c.west !== 0.5 || c.north-c.south !== 0.5 ||
       !(c.north <= -20 || c.south >= 20))) throw new Error("Comparison needs extratropical 0.5° cells");
@@ -39,7 +43,8 @@ export function validateComparison(input: unknown): Manifest {
     const expected = Date.UTC(year,month,1);
     if (Date.parse(times[i]) !== expected) throw new Error("Comparison state timestamp/month mismatch");
   }
-  for (const values of [m.populations?.sst, m.populations?.difference]) {
+  if (m.staticDepth?.file !== "depth.bin" || typeof m.depthDescription !== "string") throw new Error("Missing fixed H field");
+  for (const values of [m.populations?.sst, m.populations?.difference, m.populations?.effect, m.populations?.depth]) {
     if (!Array.isArray(values) || !values.length || values.some((v,i)=>!Number.isFinite(v) || (i>0 && v<values[i-1]))) {
       throw new Error("Invalid fixed colour population");
     }
@@ -50,6 +55,7 @@ export function validateComparison(input: unknown): Manifest {
 /** Native-resolution science stays in NetCDF; browser retains at most three monthly buffers. */
 export class ComparisonData {
   private cache = new Map<number, Promise<ArrayBuffer>>();
+  private depth: Promise<ArrayBuffer> | undefined;
   private fetcher: typeof fetch;
   constructor(readonly manifest: Manifest, fetcher: typeof fetch = fetch) {
     // Call the supplied function without assigning ComparisonData as native fetch's receiver.
@@ -57,16 +63,31 @@ export class ComparisonData {
   }
 
   population(layer: ComparisonLayer): readonly number[] {
-    return layer === "difference" ? this.manifest.populations.difference : this.manifest.populations.sst;
+    return layer === "depth" ? this.manifest.populations.depth : layer === "effect" ? this.manifest.populations.effect : layer === "difference" ? this.manifest.populations.difference : this.manifest.populations.sst;
   }
 
   async frame(index: number, layer: ComparisonLayer): Promise<NumericalField> {
     if (!Number.isInteger(index) || index < 0 || index >= this.manifest.frames.length) throw new Error("Frame index out of range");
+    if (layer === "depth") {
+      this.depth ??= this.fetcher("/data/era5_comparison/depth.bin").then(async response => {
+        if (!response.ok) throw new Error("Unable to load fixed H");
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength !== this.manifest.grid.cells.length * 4) throw new Error("H file size mismatch");
+        return buffer;
+      });
+      const view = new DataView(await this.depth);
+      const values = Array.from({length:this.manifest.grid.cells.length},(_,i)=>{
+        const value=view.getFloat32(i*4,true);
+        if (Number.isFinite(value) && value<=0) throw new Error("Invalid fixed H value");
+        return Number.isFinite(value)?value:null;
+      });
+      return validateField({gridId:this.manifest.grid.id,name:layerNames.depth,units:"m",colorScale:"sequential",description:this.manifest.depthDescription,timeLabel:"Fixed throughout the simulation · de Boyer Montégut (2023)",values},this.manifest.grid);
+    }
     if (!this.cache.has(index)) {
       const request = this.fetcher(`/data/era5_comparison/${this.manifest.frames[index].file}`).then(async response => {
         if (!response.ok) throw new Error(`Unable to load comparison frame: ${response.status}`);
         const buffer = await response.arrayBuffer();
-        if (buffer.byteLength !== this.manifest.grid.cells.length * 3 * 4) throw new Error("Comparison frame size mismatch");
+        if (buffer.byteLength !== this.manifest.grid.cells.length * 5 * 4) throw new Error("Comparison frame size mismatch");
         return buffer;
       });
       this.cache.set(index, request);
@@ -75,7 +96,7 @@ export class ComparisonData {
     }
     const view = new DataView(await this.cache.get(index)!);
     const count = this.manifest.grid.cells.length;
-    const layerIndex = ["model", "era5", "difference"].indexOf(layer);
+    const layerIndex = ["with_diffusion", "baseline", "era5", "difference", "effect"].indexOf(layer);
     const values = Array.from({ length: count }, (_, i) => {
       const value = view.getFloat32((layerIndex * count + i) * 4, true);
       return Number.isFinite(value) ? value : null;

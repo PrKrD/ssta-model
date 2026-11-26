@@ -41,7 +41,7 @@ export class LayerLegend {
   /** Time changes do not regenerate the fixed gradient and scale labels. */
   updateTimestamp(timestamp?: string, timeLabel?: string): void {
     if (!this.timestamp) return;
-    this.timestamp.hidden = timestamp === undefined;
-    this.timestamp.textContent = timestamp ? `${timeLabel ? `${timeLabel} · ` : ""}State timestamp: ${timestamp}` : "";
+    this.timestamp.hidden = timestamp === undefined && !timeLabel;
+    this.timestamp.textContent = timestamp ? `${timeLabel ? `${timeLabel} · ` : ""}State timestamp: ${timestamp}` : timeLabel ?? "";
   }
 }

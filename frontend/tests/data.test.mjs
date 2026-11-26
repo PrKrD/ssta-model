@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { loadModule } from "./load-module.mjs";
 
 const { validateDataset, validateField } = await loadModule("../src/data/field.ts");
-const { createDemoDataset } = await loadModule("../src/data/demo.ts");
 const dataset = () => ({
   grid: { id: "grid", cells: [{ id: "0", west: -10, east: 10, south: -5, north: 5 }] },
   field: { gridId: "grid", name: "Test field", units: "1", colorScale: "diverging", description: "Test only", values: [-2] },
@@ -62,15 +61,4 @@ test("new values and optional timestamps can reference the same fixed grid", () 
   assert.deepEqual(next.values, [4]);
   assert.deepEqual(parsed.field.values, [-2]);
   assert.throws(() => validateField({ ...next, gridId: "other" }, parsed.grid));
-});
-
-test("demo is deterministic, coarse, explicitly synthetic and contains signed values and gaps", () => {
-  const demo = validateDataset(createDemoDataset());
-  assert.deepEqual(demo, validateDataset(createDemoDataset()));
-  assert.equal(demo.grid.cells.length, 288);
-  assert.equal(demo.field.units, "1");
-  assert.match(demo.field.description, /not observational SST/);
-  assert.ok(demo.field.values.includes(null));
-  assert.ok(demo.field.values.some((v) => v < 0));
-  assert.ok(demo.field.values.some((v) => v > 0));
 });

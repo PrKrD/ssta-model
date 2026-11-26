@@ -4,7 +4,7 @@ All raw and processed data here are Git-ignored; only this README is tracked.
 The original seven supplied NetCDF files were deliberately removed after
 preparation to save disk space. Existing processed products and saved model
 outputs remain usable. Do not restore raw files or rerun preparation for
-[visualization](../experiments/README.md#offline-sst-visualization-export).
+[visualization](../frontend/README.md).
 The preparation documentation below records the original workflow; its
 regeneration command requires separately available originals.
 During preparation, the seven files used their original names under `raw/`.
@@ -76,7 +76,7 @@ disk space; their subsequent deliberate removal is separate from compression.
   forcing product; the raw intercept and reconstruction offset are audited.
   Seasonal-only products are rejected, never averaged into an annual fit.
 - Runtime spatial fields use the supplied ERA5 **0.25° grid**, not the Cesium
-  demonstration grid. Latitude decreases; longitude increases from 0 to 359.75°.
+  display grid. Latitude decreases; longitude increases from 0 to 359.75°.
   +20° and −20° are included; the intervening tropical region is excluded.
 - ERA5 ocean means `lsm < 0.5`. All 574 monthly classifications are verified
   identical. The first fractional field is retained, including mixed coastal
@@ -184,3 +184,16 @@ original compact products or their manifest. Existing ERA5 products are protecte
 from overwrite. See [definitions](../docs/era5_comparison.md) and
 [commands](../experiments/README.md#historical-era5-comparison). Analysis/export
 need no raw SST and do not call the original preparation pipeline.
+
+## Fixed H provenance
+
+The processed H is from **de Boyer Montégut (2023)**, original
+`mld_dr003_ref10m_v2023.nc`, [DOI 10.17882/91774](https://doi.org/10.17882/91774).
+The [product documentation](https://www.seanoe.org/data/00806/91774/data/103668.pdf)
+specifies a 0.03 kg m-3 density threshold from 10 m and a 1-degree monthly
+climatology. Existing preparation took the maximum of 12 valid monthly maps
+and used containing-cell transfer to 0.25-degree ERA5 centres. These values,
+masks, coverage fields and source files are not regenerated or modified by the
+diffusion experiment. The new static display/map reads processed H only. Native
+H remains geographically varying and temporally fixed; harmonic face depths
+are numerical diffusion conductances, not replacement H data.

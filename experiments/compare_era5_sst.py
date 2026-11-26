@@ -5,14 +5,13 @@ from pathlib import Path
 
 from ssta_model.analysis.era5_comparison import analyse_comparison
 from ssta_model.core.simulation import run_experiment
-from ssta_model.data.comparison_export import export_comparison
 from ssta_model.data.era5 import prepare_era5
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--stage", choices=("prepare", "run", "analyse", "export", "all"), default="all"
+        "--stage", choices=("prepare", "run", "analyse", "all"), default="all"
     )
     parser.add_argument(
         "--source",
@@ -28,8 +27,6 @@ def main():
         run_experiment("configs/historical_surface_flux_era5_initialised.toml")
     if args.stage in ("analyse", "all"):
         analyse_comparison(run, processed)
-    if args.stage in ("export", "all"):
-        export_comparison(run, processed, Path("frontend/public/data/era5_comparison"))
 
 
 if __name__ == "__main__":

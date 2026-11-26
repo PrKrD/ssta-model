@@ -408,3 +408,30 @@ def test_observed_january_initialization_february_first_no_later_assimilation(
             xr.open_dataset(root / f"runs/observed_repeat/{h}_sst.nc") as second,
         ):
             np.testing.assert_array_equal(first.sst_anomaly, second.sst_anomaly)
+
+
+def test_diffusion_off_and_zero_kappa_reproduce_independent_cell_runner(experiment):
+    root, path, _, _ = experiment
+    text = path.read_text()
+    baseline = run_experiment(path, root)
+    for enabled, kappa, name in ((False, 1000.0, "off"), (True, 0.0, "zero")):
+        configured = (
+            text.replace(
+                "surface_damping=true",
+                f"surface_damping=true\nhorizontal_diffusion={str(enabled).lower()}",
+            )
+            .replace("rho_kg_m3=1025.0", f"rho_kg_m3=1025.0\nkappa_m2_s={kappa}")
+            .replace('directory="runs/test"', f'directory="runs/{name}"')
+        )
+        path.write_text(configured)
+        current = run_experiment(path, root)
+        for h in ("north", "south"):
+            assert (
+                current["hemispheres"][h]["monthly"]
+                == baseline["hemispheres"][h]["monthly"]
+            )
+            with (
+                xr.open_dataset(root / f"runs/test/{h}_sst.nc") as original,
+                xr.open_dataset(root / f"runs/{name}/{h}_sst.nc") as new,
+            ):
+                np.testing.assert_array_equal(original.sst_anomaly, new.sst_anomaly)

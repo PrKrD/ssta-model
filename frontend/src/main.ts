@@ -1,11 +1,8 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
-import { loadDataset } from "./data/load";
 import { loadComparison } from "./data/comparison";
 import type { ComparisonLayer } from "./data/comparison";
-import { sequenceFrame } from "./data/field";
 import type { GridCell } from "./data/field";
-import { sortedSequenceValues } from "./globe/ColorScale";
 import { GridLayer } from "./globe/GridLayer";
 import { GridPicking } from "./globe/GridPicking";
 import { createViewer } from "./globe/Viewer";
@@ -22,23 +19,19 @@ function element(id: string): HTMLElement {
 }
 
 async function bootstrap(): Promise<() => void> {
-  const requested = new URLSearchParams(window.location.search).get("dataset");
-  const comparison = requested !== "demo" && requested !== "pilot" ? await loadComparison().catch(() => null) : null;
-  const loaded = comparison ? null : await loadDataset(requested === "demo");
-  const grid = comparison?.manifest.grid ?? loaded!.dataset.grid;
-  const sequence = loaded?.dataset.sequence;
-  const times = comparison?.manifest.timestamps ?? sequence!.timestamps;
-  const labels = comparison?.manifest.frameLabels ?? sequence!.frameLabels;
-  let selected: ComparisonLayer = "model";
-  const getFrame = (i: number) => comparison ? comparison.frame(i, selected) : Promise.resolve(sequenceFrame(sequence!, i));
-  const legacyPopulation = sequence ? sortedSequenceValues(sequence.frames) : [];
-  const population = () => comparison ? comparison.population(selected) : legacyPopulation;
+  const comparison = await loadComparison();
+  const grid = comparison.manifest.grid;
+  const times = comparison.manifest.timestamps;
+  const labels = comparison.manifest.frameLabels;
+  let selected: ComparisonLayer = "with_diffusion";
+  const getFrame = (i: number) => comparison.frame(i, selected);
+  const population = () => comparison.population(selected);
   let field = await getFrame(0);
   let index = 0;
   element("description").textContent = field.description;
-  element("badge").textContent = comparison ? "RETROSPECTIVE ERA5 COMPARISON · 0.5°" : loaded!.source === "model" ? "MODELLED SST · HISTORICAL PILOT" : "SYNTHETIC DEMONSTRATION";
+  element("badge").textContent = "HISTORICAL DIFFUSION COMPARISON · 0.5°";
   element("dataset-name").textContent = field.name;
-  document.title = comparison ? "SSTA Model · ERA5 comparison" : loaded!.source === "model" ? "SSTA Model · Historical SST pilot" : "SSTA Model · Synthetic demonstration";
+  document.title = "SSTA Model · Diffusion comparison";
   const viewer = createViewer("globe");
   const layer = new GridLayer(viewer, grid, field, population());
   const tooltip = new Tooltip(element("tooltip"));
@@ -57,13 +50,16 @@ async function bootstrap(): Promise<() => void> {
     hovered = cell ? { cell, x, y } : null;
     refreshTooltip();
   });
-  const notice = comparison ? "0.5° common-ocean spatial aggregates · fixed sampled colour percentiles" : `${requested !== "pilot" && requested !== "demo" ? "Comparison export unavailable · " : ""}${loaded!.notice}`;
-  const status = () => { element("status").textContent = `${notice} · ${grid.cells.length} cells · ${times.length} months`; };
+  const status = () => {
+    element("status").textContent = selected === "depth"
+      ? `H is fixed · playback paused · selected month ${comparison.manifest.months[index]} preserved`
+      : `0.5° common-ocean spatial aggregates · ${grid.cells.length} cells · ${times.length} months · fixed colour limits`;
+  };
   let generation = 0;
   let displayedLayer: ComparisonLayer = selected;
   const showFrame = async () => {
     const ticket = ++generation;
-    if (comparison) element("status").textContent = `Loading ${labels?.[index] ?? times[index]}…`;
+    element("status").textContent = `Loading ${labels[index]}…`;
     try {
       const next = await getFrame(index);
       if (ticket !== generation) return;
@@ -72,8 +68,9 @@ async function bootstrap(): Promise<() => void> {
       if (changedLayer) layer.setPopulation(population());
       layer.setField(field);
       element("dataset-name").textContent = field.name;
-      if (changedLayer) legend.show(field, layer.getColorScale());
+      if (changedLayer) controls.setType(field.colorScale, selected === "depth");
       else legend.updateTimestamp(field.timestamp, field.timeLabel);
+      element("description").textContent = field.description;
       displayedLayer = selected;
       refreshTooltip();
       status();
@@ -88,18 +85,25 @@ async function bootstrap(): Promise<() => void> {
       index = state.index;
       void showFrame();
     }
-    playbackControls.show(state, times[index], labels?.[index]);
+    playbackControls.show(state, times[index], labels[index]);
   });
   const playbackControls = new PlaybackControls(element("playback"), times.length, {
-    toggle: () => playback.getState().playing ? playback.pause() : playback.play(),
-    seek: (next) => playback.seek(next),
-    step: (direction) => playback.step(direction),
-    speed: (speed) => playback.setSpeed(speed),
+    toggle: () => {
+      if (selected !== "depth") playback.getState().playing ? playback.pause() : playback.play();
+    },
+    seek: (next) => { if (selected !== "depth") playback.seek(next); },
+    step: (direction) => { if (selected !== "depth") playback.step(direction); },
+    speed: (speed) => { if (selected !== "depth") playback.setSpeed(speed); },
   });
   playbackControls.show(playback.getState(), field.timestamp!, field.timeLabel);
   const selector = element("comparison-layer") as HTMLSelectElement;
-  element("comparison-control").hidden = !comparison;
-  const changeLayer = () => { selected = selector.value as ComparisonLayer; void showFrame(); };
+  element("comparison-control").hidden = false;
+  const changeLayer = () => {
+    selected = selector.value as ComparisonLayer;
+    if (selected === "depth") playback.pause();
+    playbackControls.setDisabled(selected === "depth", playback.getState());
+    void showFrame();
+  };
   selector.addEventListener("change", changeLayer);
   const visibility = () => playback.setHidden(document.hidden);
   document.addEventListener("visibilitychange", visibility);
@@ -126,5 +130,5 @@ bootstrap().then((dispose) => {
   });
 }).catch((error) => {
   console.error(error);
-  element("status").textContent = "Unable to start the globe. Check WebGL support and the browser console.";
+  element("status").textContent = `Unable to load the historical comparison: ${String(error)}. Generate assets with python experiments/compare_diffusion.py --stage export.`;
 });

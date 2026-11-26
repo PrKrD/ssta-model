@@ -24,6 +24,30 @@ def load_configuration(path, root=Path(".")):
     for key in ("surface_forcing", "surface_damping"):
         if type(config["physics"][key]) is not bool:
             raise ValueError(f"{key} must be boolean")
+    diffusion = config["physics"].setdefault("horizontal_diffusion", False)
+    if type(diffusion) is not bool:
+        raise ValueError("horizontal_diffusion must be boolean")
+    kappa = config["parameters"].get("kappa_m2_s", 0.0)
+    if type(kappa) not in (float, int) or not np.isfinite(kappa) or kappa < 0:
+        raise ValueError("kappa_m2_s must be finite and nonnegative")
+    if diffusion and "kappa_m2_s" not in config["parameters"]:
+        raise ValueError("Diffusion requires explicit kappa_m2_s")
+    solver = config.setdefault("solver", {})
+    if diffusion:
+        defaults = {
+            "rtol": 1e-12,
+            "maxiter": 500,
+            "relative_limit": 1e-10,
+            "budget_limit": 1e-6,
+        }
+        if set(solver) - set(defaults):
+            raise ValueError("Unknown diffusion solver setting")
+        for key, default in defaults.items():
+            value = solver.setdefault(key, default)
+            if type(value) not in (int, float) or not np.isfinite(value) or value <= 0:
+                raise ValueError(f"Invalid solver {key}")
+        if type(solver["maxiter"]) is not int:
+            raise ValueError("maxiter must be integer")
     for key in ("rho_kg_m3", "cp_j_kg_k"):
         value = config["parameters"][key]
         if type(value) not in (int, float) or not np.isfinite(value) or value <= 0:
