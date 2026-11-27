@@ -10,7 +10,9 @@ stochastic forcing.
 
 Science remains at native 0.25-degree resolution. The standalone 0.5-degree Cesium
 viewer selects SST with diffusion, without diffusion, ERA5, their differences,
-and static mixed-layer depth. It has no Python server or API. Obsolete synthetic
+and static mixed-layer depth. An optional local Python API now runs a fixed
+24-month experiment from one damping control; see [interactive damping](docs/interactive_damping.md).
+Obsolete synthetic
 and 24-month demonstrations have been retired.
 
 A separate [H/mask rebuild comparison](docs/h_rebuild.md) uses the reuploaded MLD
@@ -28,7 +30,7 @@ experiments, ERA5, H effects and both static depths.
 Use Python 3.11+ and Node.js 22+:
 
 ```sh
-python -m pip install -e ".[dev,visualization]"
+python -m pip install -e ".[dev,api,visualization]"
 python -m pytest
 ruff check .
 ruff format --check .

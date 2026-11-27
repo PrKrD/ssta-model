@@ -1,8 +1,15 @@
 # Architecture
 
-The scientific package is independent of the Cesium frontend. Implement only
-processes required by the research experiment; no API, run manager, database or
-solver registry is introduced.
+The scientific core remains independent of the Cesium frontend and optional
+local API. Implement only processes required by the research experiment; no
+general run manager, database or solver registry is introduced.
+
+The [local damping adapter](interactive_damping.md) is optional. `api.py` handles
+three request/status/result endpoints and display-file serving with one active
+run. `interactive.py` applies the fixed tracked 24-month template, invokes the
+existing runner in a child process and reuses the display aggregation. Status
+lives only in memory; outputs have unique ignored directories. Scientific core
+modules never import FastAPI or the adapter. Only gamma is adjustable.
 
 ## Scientific responsibilities
 
@@ -85,7 +92,9 @@ SST layers share fixed colour limits where
 compared, differences have their own symmetric scales, and H uses a sequential
 scale in metres. Static H pauses/disables playback and preserves the month for
 returning to SST. No runtime NetCDF parser, backend communication or framework
-is required. Obsolete demonstrations and their routes have been removed.
+is required for historical viewing. The optional local damping control uses the
+API only for explicit runs, polling status and fetching completed static results.
+It reuses the same geometry and controls. Obsolete demonstration routes remain removed.
 
 ## Reproducibility and storage
 

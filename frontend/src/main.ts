@@ -11,6 +11,8 @@ import { LayerLegend } from "./ui/LayerLegend";
 import { Tooltip } from "./ui/Tooltip";
 import { PlaybackController } from "./PlaybackController";
 import { PlaybackControls } from "./ui/PlaybackControls";
+import { DampingControls } from "./ui/DampingControls";
+import type { InteractiveData } from "./data/interactive";
 
 function element(id: string): HTMLElement {
   const found = document.getElementById(id);
@@ -21,11 +23,14 @@ function element(id: string): HTMLElement {
 async function bootstrap(): Promise<() => void> {
   const comparison = await loadComparison();
   const grid = comparison.manifest.grid;
-  const times = comparison.manifest.timestamps;
-  const labels = comparison.manifest.frameLabels;
-  let selected: ComparisonLayer = "bilinear";
-  const getFrame = (i: number) => comparison.frame(i, selected);
-  const population = () => comparison.population(selected);
+  let interactive: InteractiveData | null = null;
+  let selected: ComparisonLayer | "interactive" = "bilinear";
+  const times = () => selected === "interactive" ? interactive!.manifest.timestamps : comparison.manifest.timestamps;
+  const labels = () => selected === "interactive" ? interactive!.manifest.frameLabels : comparison.manifest.frameLabels;
+  const isStatic = () => selected !== "interactive" && isDepthLayer(selected);
+  const getFrame = (i: number) => selected === "interactive" ? interactive!.frame(i) : comparison.frame(i, selected);
+  // Retain the historical SSTA limits so damping runs remain visually comparable.
+  const population = () => comparison.population(selected === "interactive" ? "bilinear" : selected);
   let field = await getFrame(0);
   let index = 0;
   element("description").textContent = field.description;
@@ -51,15 +56,15 @@ async function bootstrap(): Promise<() => void> {
     refreshTooltip();
   });
   const status = () => {
-    element("status").textContent = isDepthLayer(selected)
+    element("status").textContent = isStatic()
       ? `H is fixed · playback paused · selected month ${comparison.manifest.months[index]} preserved`
-      : `0.5° common-ocean spatial aggregates · ${grid.cells.length} cells · ${times.length} months · fixed colour limits`;
+      : `0.5° common-ocean spatial aggregates · ${grid.cells.length} cells · ${times().length} months · fixed colour limits`;
   };
   let generation = 0;
-  let displayedLayer: ComparisonLayer = selected;
+  let displayedLayer: ComparisonLayer | "interactive" = selected;
   const showFrame = async () => {
     const ticket = ++generation;
-    element("status").textContent = `Loading ${labels[index]}…`;
+    element("status").textContent = `Loading ${labels()[index]}…`;
     try {
       const next = await getFrame(index);
       if (ticket !== generation) return;
@@ -68,8 +73,10 @@ async function bootstrap(): Promise<() => void> {
       if (changedLayer) layer.setPopulation(population());
       layer.setField(field);
       element("dataset-name").textContent = field.name;
-      if (changedLayer) controls.setType(field.colorScale, isDepthLayer(selected));
-      else legend.updateTimestamp(field.timestamp, field.timeLabel);
+      element("badge").textContent = selected === "interactive" ? "INTERACTIVE DAMPING · 0.5°" : "CONTROLLED H SENSITIVITY · 0.5°";
+      document.title = selected === "interactive" ? "SSTA Model · Interactive damping" : "SSTA Model · H sensitivity";
+      if (changedLayer) controls.setType(field.colorScale, isStatic());
+      else legend.show(field, layer.getColorScale());
       element("description").textContent = field.description;
       displayedLayer = selected;
       refreshTooltip();
@@ -80,37 +87,64 @@ async function bootstrap(): Promise<() => void> {
       element("status").textContent = `Unable to load comparison month: ${String(error)}`;
     }
   };
-  const playback = new PlaybackController(times.length, (state) => {
-    if (index !== state.index) {
-      index = state.index;
-      void showFrame();
-    }
-    playbackControls.show(state, times[index], labels[index]);
-  });
-  const playbackControls = new PlaybackControls(element("playback"), times.length, {
-    toggle: () => {
-      if (!isDepthLayer(selected)) playback.getState().playing ? playback.pause() : playback.play();
-    },
-    seek: (next) => { if (!isDepthLayer(selected)) playback.seek(next); },
-    step: (direction) => { if (!isDepthLayer(selected)) playback.step(direction); },
-    speed: (speed) => { if (!isDepthLayer(selected)) playback.setSpeed(speed); },
-  });
-  playbackControls.show(playback.getState(), field.timestamp!, field.timeLabel);
+  let playback: PlaybackController;
+  let playbackControls: PlaybackControls;
+  const configurePlayback = (next: number) => {
+    playback?.destroy();
+    playbackControls?.destroy();
+    index = Math.min(next, times().length - 1);
+    playback = new PlaybackController(times().length, state => {
+      if (index !== state.index) { index = state.index; void showFrame(); }
+      playbackControls.show(state, times()[state.index], labels()[state.index]);
+    });
+    playbackControls = new PlaybackControls(element("playback"), times().length, {
+      toggle: () => { if (!isStatic()) playback.getState().playing ? playback.pause() : playback.play(); },
+      seek: next => { if (!isStatic()) playback.seek(next); },
+      step: direction => { if (!isStatic()) playback.step(direction); },
+      speed: speed => { if (!isStatic()) playback.setSpeed(speed); },
+    });
+    playback.seek(index);
+    playback.setHidden(document.hidden);
+    playbackControls.setDisabled(isStatic(), playback.getState());
+  };
+  configurePlayback(0);
   const selector = element("comparison-layer") as HTMLSelectElement;
   element("comparison-control").hidden = false;
+  let historicalIndex = 0;
+  let interactiveIndex = 0;
   const changeLayer = () => {
-    selected = selector.value as ComparisonLayer;
-    if (isDepthLayer(selected)) playback.pause();
-    playbackControls.setDisabled(isDepthLayer(selected), playback.getState());
+    const wasInteractive = selected === "interactive";
+    if (wasInteractive) interactiveIndex = index; else historicalIndex = index;
+    selected = selector.value as ComparisonLayer | "interactive";
+    if (wasInteractive !== (selected === "interactive")) configurePlayback(selected === "interactive" ? interactiveIndex : historicalIndex);
+    if (isStatic()) playback.pause();
+    playbackControls.setDisabled(isStatic(), playback.getState());
     void showFrame();
   };
   selector.addEventListener("change", changeLayer);
+  let disposed = false;
+  const damping = new DampingControls(element("damping"), grid, async data => {
+    await data.frame(0);
+    if (disposed) return;
+    if (selected !== "interactive") historicalIndex = index;
+    interactive = data;
+    let option = selector.querySelector<HTMLOptionElement>('option[value="interactive"]');
+    if (!option) {option = document.createElement("option"); option.value = "interactive"; selector.append(option);}
+    option.textContent = data.manifest.name;
+    selected = "interactive";
+    selector.value = selected;
+    interactiveIndex = 0;
+    configurePlayback(0);
+    await showFrame();
+  });
   const visibility = () => playback.setHidden(document.hidden);
   document.addEventListener("visibilitychange", visibility);
   visibility();
   status();
   return () => {
+    disposed = true;
     generation++;
+    damping.destroy();
     selector.removeEventListener("change", changeLayer);
     document.removeEventListener("visibilitychange", visibility);
     playback.destroy();

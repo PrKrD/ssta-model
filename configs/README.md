@@ -1,5 +1,10 @@
 # Experiment configurations
 
+[interactive_damping.toml](interactive_damping.toml) fixes the local interactive
+experiment to January 1979–December 1980 with observed initialization, bilinear H
+and diffusion. The API overrides only gamma and the unique output directory;
+it never rewrites this template or baseline damping. See [local execution](../docs/interactive_damping.md).
+
 [historical_surface_flux_bilinear_h.toml](historical_surface_flux_bilinear_h.toml)
 selects `mixed_layer_depth.variant="era5_bilinear"` for the controlled H-only
 sensitivity. The default `baseline` variant preserves older configurations.

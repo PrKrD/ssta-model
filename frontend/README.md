@@ -1,8 +1,23 @@
 # Historical SST H-sensitivity viewer
 
 Framework-free TypeScript/Vite/Cesium, independent of the scientific Python
-runtime. No API, database, runtime NetCDF parser, ion token or remote imagery
-is used. WebGL and Node.js 22+ are required.
+runtime for historical viewing. An optional local API runs a fixed 24-month
+damping experiment. No database, runtime NetCDF parser, ion token or remote
+imagery is used. WebGL and Node.js 22+ are required.
+
+## Interactive damping
+
+Start `python -m uvicorn ssta_model.api:app --reload` from the repository root
+after installing `.[api]`, then run `npm run dev` here. Vite forwards `/api` to
+127.0.0.1:8000. Set gamma with the compact slider/numerical input and press
+**Run Simulation**. The exact default is preserved in the numerical input.
+The button is disabled while status is polled. On completion, the 24-state
+interactive result loads automatically using the existing geometry and shared
+historical SST colours. Play/seek to see subsequent months.
+
+All historical/static H selections remain; each sequence keeps its own timeline
+position. The interactive selector retains the latest completed run. Nothing
+overwrites historical assets. See [fixed settings, endpoints and local limits](../docs/interactive_damping.md).
 
 ## Run
 

@@ -1,5 +1,10 @@
 # Generated scientific outputs
 
+`interactive_damping/<run_id>/` stores each explicitly requested local damping
+experiment separately: request TOML, log, scientific `model/` and static
+`display/` assets. Status exists only in the running API process. Directories
+are not overwritten or automatically deleted. See [interactive damping](../docs/interactive_damping.md).
+
 All contents except this README are ignored by Git. Use a separate directory per
 experiment; the runner refuses existing output directories. No run manager exists.
 

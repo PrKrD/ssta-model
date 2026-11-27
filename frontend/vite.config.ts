@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
+const proxy = { "/api": "http://127.0.0.1:8000" };
+
 export default defineConfig({
   define: {
     CESIUM_BASE_URL: JSON.stringify("/cesium"),
@@ -15,5 +17,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+    proxy,
   },
+  preview: { proxy },
 });

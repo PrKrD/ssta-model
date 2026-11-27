@@ -1,6 +1,7 @@
 """Controlled analytical and end-to-end cases; no local scientific datasets needed."""
 
 import json
+from pathlib import Path
 
 import netCDF4
 import numpy as np
@@ -586,3 +587,116 @@ def test_selected_depth_validates_polar_retention(experiment):
     candidate.to_netcdf(p, mode="w")
     with pytest.raises(ValueError, match="polar H"):
         load_hemisphere(directory, "north", ocean, "era5_bilinear")
+
+
+def test_interactive_worker_uses_selected_gamma_and_exports_24_states(experiment):
+    """Actual child-process solver/export on controlled tiny inputs, without local data."""
+    from ssta_model.data.comparison_export import comparison_bins
+    from ssta_model.interactive import execute_run
+
+    root, _, ocean, _ = experiment
+    directory = root / "data/processed"
+    dates = np.arange("1979-01", "1981-01", dtype="datetime64[M]").astype(
+        "datetime64[ns]"
+    )
+    for h, sign in (("north", 1), ("south", -1)):
+        path = directory / f"{h}_pcs.nc"
+        with xr.open_dataset(path) as ds:
+            pcs = ds.load().drop_dims("time").assign_coords(time=dates)
+        pcs["standardized_pc"] = (
+            ("time", "mode"),
+            sign * np.cos(np.arange(24)[:, None] / 5) * np.arange(1, 13)[None, :],
+        )
+        pcs.standardized_pc.attrs = {"units": "1", "ddof": 1}
+        pcs.attrs.update(first_month="1979-01", last_month="1980-12")
+        pcs.to_netcdf(path, mode="w")
+        path = directory / f"{h}_regression.nc"
+        with xr.open_dataset(path) as ds:
+            regression = ds.load()
+        regression.attrs.update(first_month="1979-01", last_month="1980-12")
+        regression.to_netcdf(path, mode="w")
+        grid = extratropics(ocean, h)
+        era = xr.Dataset(
+            {
+                "sst_anomaly": (
+                    ("time", "latitude", "longitude"),
+                    np.full((24, 2, 4), 1.5),
+                )
+            },
+            coords={
+                "time": dates,
+                "latitude": grid.latitude,
+                "longitude": grid.longitude,
+            },
+        )
+        era.sst_anomaly.attrs["units"] = "K"
+        era.to_netcdf(directory / f"{h}_era5_ssta.nc")
+    candidate_fixture(root, ocean)
+    manifest = {
+        "products": [
+            {"filename": p.name, "sha256": checksum(p)} for p in directory.glob("*.nc")
+        ]
+    }
+    (directory / "manifest.json").write_text(json.dumps(manifest))
+    template = Path(__file__).resolve().parents[1] / "configs/interactive_damping.toml"
+    (root / "configs/interactive_damping.toml").write_text(template.read_text())
+    keys = []
+    for h in ("north", "south"):
+        with xr.open_dataset(directory / f"{h}_surface_h_era5_bilinear.nc") as ds:
+            bins = comparison_bins(ds.latitude.values, ds.longitude.values)
+            keys.extend(bins[np.isfinite(ds.H.values)].tolist())
+    cells = [
+        {
+            "id": f"comparison-{k}",
+            "west": -180 + (k % 720) / 2,
+            "east": -180 + (k % 720 + 1) / 2,
+            "south": -90 + (k // 720) / 2,
+            "north": -90 + (k // 720 + 1) / 2,
+        }
+        for k in sorted(set(keys))
+    ]
+    grid_path = root / "frontend/public/data/era5_comparison"
+    grid_path.mkdir(parents=True)
+    (grid_path / "manifest.json").write_text(
+        json.dumps({"grid": {"id": "controlled-grid", "cells": cells}})
+    )
+    folders = []
+    for gamma in (10.0, 20.0):
+        folder = root / f"runs/interactive_damping/test{int(gamma)}"
+        folder.mkdir(parents=True)
+        execute_run(root, folder, gamma)
+        folders.append(folder)
+        display = json.loads((folder / "display/manifest.json").read_text())
+        assert (
+            display["months"]
+            == np.arange("1979-01", "1981-01", dtype="datetime64[M]")
+            .astype(str)
+            .tolist()
+        )
+        assert len(display["frames"]) == 24 and display["gamma_w_m2_k"] == gamma
+        assert display["timestamps"][0] == "1979-02-01T00:00:00Z"
+        assert display["timestamps"][-1] == "1981-01-01T00:00:00Z"
+        with (
+            xr.open_dataset(folder / "model/north_sst.nc") as ds,
+            xr.open_dataset(directory / "north_pcs.nc") as pcs,
+        ):
+            config = json.loads(ds.attrs["configuration_json"])
+            assert config["surface_damping"]["gamma_w_m2_k"] == gamma
+            assert config["mixed_layer_depth"]["variant"] == "era5_bilinear"
+            assert config["parameters"]["kappa_m2_s"] == 1000
+            active = ds.input_valid.values == 1
+            forcing = np.sum(pcs.standardized_pc.values[1])
+            dt = 28 * 86400
+            expected = (1025 * 3990 * 75 * 1.5 + dt * forcing) / (
+                1025 * 3990 * 75 + dt * gamma
+            )
+            np.testing.assert_allclose(
+                ds.sst_anomaly.values[0][active], expected, atol=1e-6
+            )
+    with (
+        xr.open_dataset(folders[0] / "model/north_sst.nc") as a,
+        xr.open_dataset(folders[1] / "model/north_sst.nc") as b,
+    ):
+        np.testing.assert_array_equal(a.initial_sst_anomaly, b.initial_sst_anomaly)
+        np.testing.assert_array_equal(a.input_valid, b.input_valid)
+        assert np.nanmax(abs(a.sst_anomaly.values - b.sst_anomaly.values)) > 0.01
