@@ -7,8 +7,9 @@ general run manager, database or solver registry is introduced.
 The [local damping adapter](interactive_damping.md) is optional. `api.py` handles
 three request/status/result endpoints and display-file serving with one active
 run. `interactive.py` applies the fixed tracked 24-month template, invokes the
-existing runner in a child process and reuses the display aggregation. Status
-lives only in memory; outputs have unique ignored directories. Scientific core
+existing runner in a child process and reuses the display aggregation. Active status
+lives in memory; completed runs have local timestamp records and unique ignored
+directories, with five-completion retention confined to interactive outputs. Scientific core
 modules never import FastAPI or the adapter. Only gamma is adjustable.
 
 ## Scientific responsibilities

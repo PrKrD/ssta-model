@@ -75,5 +75,6 @@ See [physics, discretisation and solver verification](docs/surface_flux_model.md
 [ERA5 climatology/time/comparison definitions](docs/era5_comparison.md),
 [architecture](docs/architecture.md), [experiment commands](experiments/README.md),
 [input provenance](data/README.md), [output conventions](runs/README.md) and
-[viewer usage](frontend/README.md). Numerical heat conservation does not imply
+[viewer usage](frontend/README.md), and
+[storage cleanup/retention](docs/repository_cleanup.md). Numerical heat conservation does not imply
 that the simplified physical model reproduces observed ocean variability.

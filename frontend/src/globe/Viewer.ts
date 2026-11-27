@@ -21,5 +21,15 @@ export function createViewer(container: string): Viewer {
   viewer.scene.globe.baseColor = Color.fromCssColorString("#283748");
   viewer.scene.globe.enableLighting = false;
   viewer.camera.setView({ destination: Cartesian3.fromDegrees(15, 0, 22_000_000) });
+  // Resize the actual canvas when its available layout space changes, including
+  // when request-render mode or a background tab suspends the animation loop.
+  const resize = new ResizeObserver(() => {
+    viewer.resize();
+    viewer.scene.requestRender();
+    viewer.render();
+  });
+  resize.observe(viewer.container);
+  const destroy = viewer.destroy.bind(viewer);
+  viewer.destroy = () => { resize.disconnect(); return destroy(); };
   return viewer;
 }

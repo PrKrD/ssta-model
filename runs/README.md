@@ -2,8 +2,13 @@
 
 `interactive_damping/<run_id>/` stores each explicitly requested local damping
 experiment separately: request TOML, log, scientific `model/` and static
-`display/` assets. Status exists only in the running API process. Directories
-are not overwritten or automatically deleted. See [interactive damping](../docs/interactive_damping.md).
+`display/` assets. Completed runs persist a UTC completion timestamp in `state.json`. After each
+successful run the API retains the five newest completions and deletes older
+interactive directories, protecting queued/active work and responses in transit.
+Failed jobs retain request/log/error state but remove partial model/display
+products. Legacy completions use verified display-manifest mtime; unrecognised
+folders require manual review. Historical runs listed below are protected.
+Directories are never overwritten. See [interactive damping](../docs/interactive_damping.md).
 
 All contents except this README are ignored by Git. Use a separate directory per
 experiment; the runner refuses existing output directories. No run manager exists.
@@ -55,3 +60,8 @@ No full historical run or processed input was deleted.
 See [commands](../experiments/README.md), [finite volumes and H provenance](../docs/surface_flux_model.md),
 [comparison definitions](../docs/era5_comparison.md) and [viewer](../frontend/README.md).
 This is retrospective comparison, not independent prediction validation.
+
+Inspect local storage with `du -sk data runs frontend .venv .git` and
+`du -k -d 2 runs frontend | sort -nr | head -40`. Include ignored products in
+audits; age or ignored status alone does not justify deletion. See the
+[cleanup report](../docs/repository_cleanup.md) for measured removals and caveats.

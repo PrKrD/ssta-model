@@ -119,3 +119,20 @@ See [scientific formulation](../docs/surface_flux_model.md),
 [commands](../experiments/README.md). This is retrospective comparison of
 ERA5-related products, not independent forecast validation. No old raw
 atmospheric/MLD files are restored or required by the display workflow.
+
+## Desktop layout and retained interactive results
+
+Above 900 CSS pixels the globe container starts at the left panel's right edge
+(340 px), centring the globe in the remaining width. At narrower sizes it retains
+the full-width globe and overlaid panel; the existing compact menu applies below
+600 px. A resize observer updates Cesium's canvas with the available space without
+changing the geographical viewpoint. Picking uses canvas coordinates; tooltips
+add the canvas's viewport offset.
+
+The local API automatically retains the five newest completed interactive runs,
+with native outputs and display assets. Older runs return HTTP 410. Existing
+historical comparison and static H assets are protected. See
+[retention details](../docs/interactive_damping.md) and the
+[storage cleanup audit](../docs/repository_cleanup.md). Production `dist/` is a
+regenerable copy of public assets: build before using preview, and remove it when
+no preview server needs it to avoid storing a second full comparison export.
