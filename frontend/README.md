@@ -91,10 +91,25 @@ and geometry are unchanged; old grid-manifest hashes remain provenance, not an
 identity test. Returned geometry is validated explicitly. An incompatible grid
 is rejected with a reload/regeneration message, never silently remapped.
 
-Above 900 CSS pixels the globe starts at the panel's right edge (340 px), centred
-in the remaining space. Narrow screens retain the overlaid menu. A resize
-observer updates Cesium without changing the geographic camera target. Picking
-uses canvas coordinates and tooltips add its viewport offset.
+The app uses a two-column CSS grid: a 340 px sidebar allocation (320 px panel
+plus 20 px gutter), then the remaining space for Cesium. A container query uses
+an overlay only below the space required for that sidebar plus a 280 px globe
+(620 CSS px). Thus 700–900 px widths still have a separate globe area; browser
+zoom is handled using the actual container's CSS width. Narrow screens retain
+the compact overlaid menu. The globe fills the remaining column at full height.
+
+A resize observer updates the real canvas, projection and rendered frame after
+layout or zoom changes. The perspective field of view preserves the original
+angle along the shorter canvas axis, preventing initial global-view clipping
+in tall/narrow or short/wide spaces. Camera position, orientation and geographic
+target are unchanged; rotation and zoom remain available. Picking uses canvas
+coordinates and tooltips add its viewport offset.
+
+Layout validation covered 1440, 1024, 900, 800, 700 and 390 px windows at native
+Chromium zoom 100%, 125% and 150%, plus the 619/620/621 px transition. Actual
+screenshots were checked for the Earth's rendered centre and clipping, alongside
+canvas bounds. UI checks covered playback, layer switching, picking, damping
+inputs and a mocked completed-result load without running the scientific model.
 
 Generic [field validation](src/data/field.ts), [globe rendering](src/globe/),
 [playback](src/PlaybackController.ts) and [UI controls](src/ui/) remain modular.
