@@ -69,7 +69,7 @@ def validate_inputs(pcs, regression, surface, ocean, hemisphere):
     return pcs
 
 
-def load_hemisphere(directory, hemisphere, ocean):
+def load_hemisphere(directory, hemisphere, ocean, depth_variant="baseline"):
     """Load only one hemisphere's fixed fields and small historical PC array."""
     products = {}
     for kind in ("pcs", "regression", "surface"):
@@ -86,6 +86,80 @@ def load_hemisphere(directory, hemisphere, ocean):
     products["pcs"] = validate_inputs(
         products["pcs"], products["regression"], products["surface"], ocean, hemisphere
     )
+    require(depth_variant in ("baseline", "era5_bilinear"), "Unknown H variant")
+    if depth_variant == "era5_bilinear":
+        from .prepare import checksum
+
+        path = directory / f"{hemisphere}_surface_h_era5_bilinear.nc"
+        with xr.open_dataset(path) as candidate:
+            baseline = products["surface"]
+            same_grid(baseline, candidate)
+            require(
+                candidate.H.dims == SPATIAL and candidate.H.attrs.get("units") == "m",
+                "Candidate H dimensions/units",
+            )
+            require(
+                candidate.attrs.get("prepared_by")
+                == "ssta_model.data.era5_h_candidate",
+                "Unknown H candidate provenance",
+            )
+            require(
+                candidate.attrs.get("baseline_sha256")
+                == checksum(directory / f"{hemisphere}_surface.nc"),
+                "Candidate baseline checksum mismatch",
+            )
+            require(
+                candidate.attrs.get("target_mask_sha256")
+                == checksum(directory / "era5_ocean_mask.nc"),
+                "Candidate ERA5 mask checksum mismatch",
+            )
+            require(
+                candidate.baseline_input_valid.dims == SPATIAL
+                and np.array_equal(
+                    candidate.baseline_input_valid, baseline.input_valid
+                ),
+                "Candidate baseline mask differs",
+            )
+            wet = extratropics(ocean, hemisphere).ocean.values == 1
+            require(
+                candidate.era5_ocean.dims == SPATIAL
+                and np.array_equal(candidate.era5_ocean.values == 1, wet),
+                "Candidate ERA5 ocean mask differs",
+            )
+            active = baseline.input_valid.values == 1
+            values = candidate.H.values
+            require(
+                np.all(np.isfinite(values[active]) & (values[active] > 0)),
+                "Candidate H missing/nonpositive at authorised cells",
+            )
+            require(np.isnan(values[~wet]).all(), "Candidate H over ERA5 land")
+            polar = (
+                np.broadcast_to(
+                    abs(baseline.latitude.values[:, None]) > 89.5, active.shape
+                )
+                & active
+            )
+            require(
+                np.array_equal(values[polar], baseline.H.values[polar]),
+                "Candidate polar H differs from baseline",
+            )
+            require(
+                candidate.support_method.dims == SPATIAL, "Candidate support dimensions"
+            )
+            support = candidate.support_method.values
+            require(
+                np.isin(support, [0, 1, 2]).all()
+                and np.array_equal(support == 2, polar),
+                "Candidate polar support flags differ",
+            )
+            require(
+                np.all(support[active & ~polar] == 1),
+                "Unsupported candidate active cell",
+            )
+            baseline["H"] = candidate.H.load()
+            baseline.attrs["mixed_layer_depth_variant"] = depth_variant
+            # baseline.input_valid has already passed the original complete-mask check.
+            # Extra finite candidate depths do not participate in domain construction.
     return products
 
 

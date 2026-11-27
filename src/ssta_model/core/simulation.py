@@ -54,6 +54,20 @@ def provenance(config_path, config):
         )
         inputs[name] = {"sha256": digest, "bytes": path.stat().st_size}
 
+    variant = config["mixed_layer_depth"]["variant"]
+    depth_inputs = {}
+    for h in ("north", "south"):
+        name = (
+            f"{h}_surface_h_era5_bilinear.nc"
+            if variant == "era5_bilinear"
+            else f"{h}_surface.nc"
+        )
+        path = directory / name
+        record = {"sha256": checksum(path), "bytes": path.stat().st_size}
+        depth_inputs[h] = {"file": name, **record}
+        if variant != "baseline":
+            inputs[name] = record
+
     code_root = Path(__file__).resolve().parents[3]
 
     def git(*args):
@@ -72,6 +86,11 @@ def provenance(config_path, config):
         "experiment_config_sha256": checksum(config_path),
         "damping_config_sha256": checksum(config["surface_damping"]["configuration"]),
         "inputs": inputs,
+        "mixed_layer_depth": {
+            "variant": variant,
+            "products": depth_inputs,
+            "mask_policy": "Validated original baseline mask preserved before unchanged observed-initialisation intersection",
+        },
         "initialization_inputs": {
             f"{h}_era5_ssta.nc": checksum(
                 Path(config["initial_conditions"]["directory"]) / f"{h}_era5_ssta.nc"
@@ -415,7 +434,9 @@ def run_experiment(config_path, root=Path(".")):
         areas = spherical_cell_areas(ocean)
         pc_dates = None
         for hemisphere in ("north", "south"):
-            products = load_hemisphere(directory, hemisphere, ocean)
+            products = load_hemisphere(
+                directory, hemisphere, ocean, config["mixed_layer_depth"]["variant"]
+            )
             dates = products["pcs"].time.values
             if pc_dates is not None:
                 require(np.array_equal(pc_dates, dates), "Hemisphere PC dates differ")

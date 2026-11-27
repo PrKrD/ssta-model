@@ -30,6 +30,10 @@ solver registry is introduced.
   `era5_h_candidate.py` reuses its source/interpolation kernels with the ERA5
   target mask and restricted polar retention; [candidate validation](h_era5_candidate.md)
   stays separate from runtime input/domain selection.
+  Runtime H selection now explicitly supports `baseline` and `era5_bilinear`.
+  Original inputs/masks are validated first; the selected candidate changes H
+  only, with complete active-cell coverage and exact polar-retention checks.
+  Observed initialization preserves its original support intersection.
 - [analysis](../src/ssta_model/analysis/) owns paired ERA5 metrics, regional series,
   native scientific figures, and the controlled with/without-diffusion comparison.
   Model and ERA5 comparisons use common finite ocean support. Analysis does not
@@ -40,7 +44,8 @@ solver registry is introduced.
 Physics/forcing must not import the orchestrator, and the package must not import
 experiments or frontend code. Parameter estimation/preparation is distinct from
 applying fixed parameters. H is unchanged de Boyer Montégut (2023) maximum monthly
-MLD, mapped by containing cells; no seasonal depth evolution is introduced.
+MLD, using original containing cells or the explicitly selected bilinear variant;
+no seasonal depth evolution is introduced.
 See [equations, geometry, conservation and solver tolerances](surface_flux_model.md)
 and [ERA5 time/mask/skill conventions](era5_comparison.md).
 
@@ -68,13 +73,15 @@ path preserves the original numerical update exactly.
 [data/diffusion_export.py](../src/ssta_model/data/diffusion_export.py) reads saved
 with/without-diffusion SST, ERA5 anomalies and processed H. It never integrates
 physics or accesses deleted raw atmospheric/MLD files. It writes one 0.5-degree
-grid, five SST arrays per monthly file and one separate static H array, with
+grid, six SST arrays per monthly file and two separate static H arrays in the
+current H-sensitivity export, with
 source identities and aggregation checks. All three SST versions share finite
 native support and areas; H independently uses finite processed depths.
 
 [frontend](../frontend/) validates these static assets and retains at most three
 monthly buffers plus H, independently of Python. Geometry and picking are reused;
-layer/month changes update colours. SST layers share fixed colour limits where
+layer/month changes update colours. Both H layers share sequential limits;
+SST layers share fixed colour limits where
 compared, differences have their own symmetric scales, and H uses a sequential
 scale in metres. Static H pauses/disables playback and preserves the month for
 returning to SST. No runtime NetCDF parser, backend communication or framework

@@ -2,8 +2,9 @@
 
 A research model of a fixed, geographically varying mixed layer, driven by
 historical atmospheric variability. The current experiment adds conservative
-horizontal diffusion to the surface-forcing/damping baseline and compares both
-with ERA5 monthly SST anomalies. This is retrospective comparison, not independent
+horizontal diffusion to the surface-forcing/damping baseline, then isolates the
+effect of bilinear H against original-H diffusion and ERA5 monthly SST anomalies.
+This is retrospective comparison, not independent
 forecast validation. There is no advection, subduction, salinity, seasonal H or
 stochastic forcing.
 
@@ -17,6 +18,10 @@ source and the old mask-aware bilinear method. It produces proposed fields and
 static diagnostics only; the selected H, ERA5 mask and historical runs are unchanged.
 The [final ERA5-targeted H candidate](docs/h_era5_candidate.md) recomputes bilinear
 H on ERA5 ocean with limited polar baseline retention and explicit domain checks.
+The [controlled historical H sensitivity](docs/h_sensitivity.md) adopts that
+existing product through explicit configuration, preserving the original active
+domain and all other parameters. The Cesium default compares all three model
+experiments, ERA5, H effects and both static depths.
 
 ## Development and execution
 
@@ -37,9 +42,9 @@ atmospheric/MLD data or rerun the original preparation pipeline.
 After operator tests and a short actual-data check:
 
 ```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python experiments/run_historical_surface_flux.py
-python experiments/compare_diffusion.py --stage analyse
-python experiments/compare_diffusion.py --stage export
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python experiments/run_historical_surface_flux.py --config configs/historical_surface_flux_bilinear_h.toml
+python experiments/compare_bilinear_h.py --stage analyse
+python experiments/compare_bilinear_h.py --stage export
 cd frontend
 npm ci
 npm run dev
@@ -61,7 +66,8 @@ initializes the model; February 1979–October 2026 provides 573 integrations.
 Later observations do not enter dynamics. H is the unchanged maximum monthly
 **de Boyer Montégut (2023)** climatology, density threshold 0.03 kg m-3 from 10 m,
 [DOI](https://doi.org/10.17882/91774), transferred from 1-degree source cells by
-containing-cell mapping. It is fixed throughout each simulation.
+containing-cell mapping or the explicitly selected bilinear variant. It is fixed
+throughout each simulation; neither mapping adds observational resolution.
 
 See [physics, discretisation and solver verification](docs/surface_flux_model.md),
 [ERA5 climatology/time/comparison definitions](docs/era5_comparison.md),

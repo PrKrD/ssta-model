@@ -26,11 +26,15 @@ containing-cell mapping, with no interpolation. These processed values remain
 unchanged. Maximum monthly climatology approximates late-winter H; it is not an
 independently verified winter-depth selection and never evolves seasonally.
 
-A [separate proposed H rebuild](h_rebuild.md) now compares the source-mask-based
-bilinear alternative with this baseline. Neither saved historical experiment has
-been rerun with that field. Runtime H/mask selection remains unchanged.
-The [ERA5-targeted candidate](h_era5_candidate.md) is a later preparation-only
-alternative with explicit active-domain validation and polar baseline retention.
+A [separate H rebuild](h_rebuild.md) first compared a source-mask-targeted
+alternative. The later [ERA5-targeted product](h_era5_candidate.md) is used in
+the [controlled H sensitivity](h_sensitivity.md), selected with
+`mixed_layer_depth.variant="era5_bilinear"`. Original inputs and their complete
+active mask are validated first; candidate H must cover that exact domain and
+preserve polar baseline depths. Only H is replaced in memory. The observed
+initialisation support, parameters, diffusion solver and saved A/B runs remain
+unchanged. The operator's heat capacity and harmonic face conductances are rebuilt
+with selected H. Interpolation adds no resolution to the original 1° climatology.
 
 The diffusion experiment uses kappa=1000 m2 s-1, a provisional constant eddy
 diffusivity, not a fit to ERA5. rho=1025 and cp=3990 remain configuration choices.

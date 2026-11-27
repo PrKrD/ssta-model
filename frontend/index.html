@@ -13,12 +13,14 @@
         <h1 id="dataset-name">Global field viewer</h1>
         <label id="comparison-control" class="control" hidden>Dataset
           <select id="comparison-layer" aria-label="Comparison dataset">
-            <option value="with_diffusion">Model SSTA — With diffusion</option>
-            <option value="baseline">Model SSTA — Without diffusion</option>
+            <option value="bilinear">Model SSTA — Bilinear H + diffusion</option>
+            <option value="with_diffusion">Model SSTA — Original H + diffusion</option>
             <option value="era5">ERA5 SSTA</option>
-            <option value="difference">Model with diffusion − ERA5</option>
-            <option value="effect">Diffusion effect — With minus without</option>
-            <option value="depth">Mixed-layer depth H — Static</option>
+            <option value="difference">Bilinear H model − ERA5</option>
+            <option value="effect">H representation effect — Bilinear minus original</option>
+            <option value="baseline">Model SSTA — Original H, no diffusion</option>
+            <option value="depth">Mixed-layer depth — Bilinear H</option>
+            <option value="depth_original">Mixed-layer depth — Original H</option>
           </select>
         </label>
         <p id="description"></p>

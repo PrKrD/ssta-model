@@ -1,4 +1,4 @@
-# Historical SST diffusion comparison viewer
+# Historical SST H-sensitivity viewer
 
 Framework-free TypeScript/Vite/Cesium, independent of the scientific Python
 runtime. No API, database, runtime NetCDF parser, ion token or remote imagery
@@ -9,7 +9,7 @@ is used. WebGL and Node.js 22+ are required.
 From the repository root, after both historical model runs exist:
 
 ```sh
-python experiments/compare_diffusion.py --stage export
+python experiments/compare_bilinear_h.py --stage export
 cd frontend
 npm ci
 npm run dev
@@ -28,23 +28,25 @@ retired. Useful generic data, colour and playback tests remain.
 
 The selector contains:
 
-1. Model SSTA — With diffusion.
-2. Model SSTA — Without diffusion.
+1. Model SSTA — Bilinear H + diffusion.
+2. Model SSTA — Original H + diffusion.
 3. ERA5 SSTA.
-4. Model with diffusion − ERA5.
-5. Diffusion effect — With minus without.
-6. Mixed-layer depth H — Static.
+4. Bilinear H model − ERA5.
+5. H representation effect — Bilinear minus original.
+6. Model SSTA — Original H, no diffusion.
+7. Mixed-layer depth — Bilinear H.
+8. Mixed-layer depth — Original H.
 
-The five time-dependent fields share 574 calendar states (January 1979 observed
+The six time-dependent fields share 574 calendar states (January 1979 observed
 initialization, then February 1979–October 2026 integrations). Switching preserves
 the selected month. Play/pause loops, previous/next and scrubbing pause, speeds
 are 0.5x/1x/2x at a 6-frame/s baseline. Hidden tabs suspend playback. A slower
 browser may skip intermediate frames rather than changing scientific timestamps.
 
-Selecting **H** pauses and disables playback but keeps the month index. Returning
+Selecting **either H layer** pauses and disables playback but keeps the month index. Returning
 to an anomaly field restores that month. H is in metres, fixed throughout the
 simulation, and uses a locked sequential colour type; percentile controls remain
-available. Anomalies default to zero-centred diverging colours. Both models and
+available. Anomalies default to zero-centred diverging colours. All three model fields and
 ERA5 share fixed full-history colour populations; each difference has its own
 fixed symmetric population. Default p2–p98 limits do not change every month.
 SST populations use deterministic rotating samples plus exact extrema, so these
@@ -53,19 +55,20 @@ uses every finite display value. Colour clipping never changes tooltip values.
 
 ## Static data contract
 
-`public/data/era5_comparison/manifest.json` uses `sst-comparison-f32-v2` and stores
+`public/data/era5_comparison/manifest.json` uses `sst-comparison-f32-v3` and stores
 one grid, chronological calendar labels, exact model state timestamps, frame
 paths, fixed populations, provenance and the static-depth path. Each monthly
-file has five layer-major little-endian float32 arrays in the order above.
-`depth.bin` contains one static array. NaN decodes to missing, not zero.
+file has six layer-major little-endian float32 arrays in the order above.
+`depth.bin` and `depth_original.bin` contain the two static arrays, with shared
+fixed colour limits. NaN decodes to missing, not zero.
 [comparison.ts](src/data/comparison.ts) validates metadata/0.5-degree geometry,
-file sizes and decoded fields, caching at most three monthly buffers plus H.
+file sizes and decoded fields, caching at most three monthly buffers plus two H buffers.
 Latest-request tracking prevents stale network responses overwriting a newer
 selection. Failed frame requests pause playback and show an error.
 
 Science stays at native **0.25 degrees**. Display tiles are **0.5 x 0.5 degrees**,
-using saved native areas. The three SST fields use exactly the same current
-finite ocean support. Differences are with-diffusion minus ERA5 or baseline on
+using saved native areas. The four direct SST fields use exactly the same current
+finite ocean support. Differences are bilinear-H minus ERA5 or original-H diffusion on
 that support. H independently uses finite positive processed depths; geometry
 also includes H-only coastal tiles, whose SST values remain missing. Counts in
 tooltips describe native H-grid cells assigned to a tile, not a claim of identical
@@ -88,10 +91,12 @@ DOM/Cesium independent. Controls, picking, legend and tooltip stay modular.
 Cesium assets are copied locally under `/cesium`. Serve at the website root;
 subpath hosting is not configured. The Cesium bundle remains large.
 
-H is the unchanged maximum monthly de Boyer Montégut (2023) climatology,
+Both H layers use maximum monthly de Boyer Montégut (2023) climatology,
 [DOI](https://doi.org/10.17882/91774), density threshold 0.03 kg m-3 from 10 m,
-originally 1-degree data mapped by containing cells. It is not a monthly animation
-or a newly estimated depth. The [native H map](../runs/README.md) is generated
+originally 1-degree data. Original H uses containing cells; bilinear H uses
+source-mask-aware periodic interpolation on ERA5 ocean, with original H retained
+beyond ±89.5° at baseline active cells. The model domain is unchanged. Neither
+layer is animated; interpolation adds no observational resolution. The [native H maps](../runs/README.md) are generated
 from processed science independently of display aggregation.
 
 See [scientific formulation](../docs/surface_flux_model.md),

@@ -78,6 +78,10 @@ def load_configuration(path, root=Path(".")):
     config.setdefault("inputs", {})["directory"] = str(
         (root / config.get("inputs", {}).get("directory", "data/processed")).resolve()
     )
+    depth = config.setdefault("mixed_layer_depth", {})
+    variant = depth.setdefault("variant", "baseline")
+    if set(depth) != {"variant"} or variant not in ("baseline", "era5_bilinear"):
+        raise ValueError("Unknown mixed-layer-depth variant/settings")
     config["output"]["directory"] = str(
         (root / config["output"]["directory"]).resolve()
     )

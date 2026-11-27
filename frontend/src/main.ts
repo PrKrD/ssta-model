@@ -1,6 +1,6 @@
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./style.css";
-import { loadComparison } from "./data/comparison";
+import { loadComparison, isDepthLayer } from "./data/comparison";
 import type { ComparisonLayer } from "./data/comparison";
 import type { GridCell } from "./data/field";
 import { GridLayer } from "./globe/GridLayer";
@@ -23,15 +23,15 @@ async function bootstrap(): Promise<() => void> {
   const grid = comparison.manifest.grid;
   const times = comparison.manifest.timestamps;
   const labels = comparison.manifest.frameLabels;
-  let selected: ComparisonLayer = "with_diffusion";
+  let selected: ComparisonLayer = "bilinear";
   const getFrame = (i: number) => comparison.frame(i, selected);
   const population = () => comparison.population(selected);
   let field = await getFrame(0);
   let index = 0;
   element("description").textContent = field.description;
-  element("badge").textContent = "HISTORICAL DIFFUSION COMPARISON · 0.5°";
+  element("badge").textContent = "CONTROLLED H SENSITIVITY · 0.5°";
   element("dataset-name").textContent = field.name;
-  document.title = "SSTA Model · Diffusion comparison";
+  document.title = "SSTA Model · H sensitivity";
   const viewer = createViewer("globe");
   const layer = new GridLayer(viewer, grid, field, population());
   const tooltip = new Tooltip(element("tooltip"));
@@ -51,7 +51,7 @@ async function bootstrap(): Promise<() => void> {
     refreshTooltip();
   });
   const status = () => {
-    element("status").textContent = selected === "depth"
+    element("status").textContent = isDepthLayer(selected)
       ? `H is fixed · playback paused · selected month ${comparison.manifest.months[index]} preserved`
       : `0.5° common-ocean spatial aggregates · ${grid.cells.length} cells · ${times.length} months · fixed colour limits`;
   };
@@ -68,7 +68,7 @@ async function bootstrap(): Promise<() => void> {
       if (changedLayer) layer.setPopulation(population());
       layer.setField(field);
       element("dataset-name").textContent = field.name;
-      if (changedLayer) controls.setType(field.colorScale, selected === "depth");
+      if (changedLayer) controls.setType(field.colorScale, isDepthLayer(selected));
       else legend.updateTimestamp(field.timestamp, field.timeLabel);
       element("description").textContent = field.description;
       displayedLayer = selected;
@@ -89,19 +89,19 @@ async function bootstrap(): Promise<() => void> {
   });
   const playbackControls = new PlaybackControls(element("playback"), times.length, {
     toggle: () => {
-      if (selected !== "depth") playback.getState().playing ? playback.pause() : playback.play();
+      if (!isDepthLayer(selected)) playback.getState().playing ? playback.pause() : playback.play();
     },
-    seek: (next) => { if (selected !== "depth") playback.seek(next); },
-    step: (direction) => { if (selected !== "depth") playback.step(direction); },
-    speed: (speed) => { if (selected !== "depth") playback.setSpeed(speed); },
+    seek: (next) => { if (!isDepthLayer(selected)) playback.seek(next); },
+    step: (direction) => { if (!isDepthLayer(selected)) playback.step(direction); },
+    speed: (speed) => { if (!isDepthLayer(selected)) playback.setSpeed(speed); },
   });
   playbackControls.show(playback.getState(), field.timestamp!, field.timeLabel);
   const selector = element("comparison-layer") as HTMLSelectElement;
   element("comparison-control").hidden = false;
   const changeLayer = () => {
     selected = selector.value as ComparisonLayer;
-    if (selected === "depth") playback.pause();
-    playbackControls.setDisabled(selected === "depth", playback.getState());
+    if (isDepthLayer(selected)) playback.pause();
+    playbackControls.setDisabled(isDepthLayer(selected), playback.getState());
     void showFrame();
   };
   selector.addEventListener("change", changeLayer);
@@ -130,5 +130,5 @@ bootstrap().then((dispose) => {
   });
 }).catch((error) => {
   console.error(error);
-  element("status").textContent = `Unable to load the historical comparison: ${String(error)}. Generate assets with python experiments/compare_diffusion.py --stage export.`;
+  element("status").textContent = `Unable to load the historical comparison: ${String(error)}. Generate assets with python experiments/compare_bilinear_h.py --stage export.`;
 });

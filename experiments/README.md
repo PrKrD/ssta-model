@@ -1,5 +1,15 @@
 # Historical research experiments
 
+## Controlled bilinear-H historical experiment
+
+After controlled tests and a short actual-data check, run the separate
+`configs/historical_surface_flux_bilinear_h.toml` configuration with
+`run_historical_surface_flux.py --config ...`. Analyse/export with
+`python experiments/compare_bilinear_h.py --stage all`. The current Cesium default
+is this H-sensitivity comparison, including original-H diffusion, no-diffusion,
+ERA5, differences and both static H fields. Existing A/B runs and processed H
+products remain unchanged. See [full commands and validation](../docs/h_sensitivity.md).
+
 Reusable science lives in `ssta_model`; entry scripts remain thin. Track
 configurations, write generated outputs to `runs/`, and preserve the full
 no-diffusion baseline under `runs/historical_surface_flux_era5_initialised/`.

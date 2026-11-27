@@ -435,3 +435,154 @@ def test_diffusion_off_and_zero_kappa_reproduce_independent_cell_runner(experime
                 xr.open_dataset(root / f"runs/{name}/{h}_sst.nc") as new,
             ):
                 np.testing.assert_array_equal(original.sst_anomaly, new.sst_anomaly)
+
+
+def candidate_fixture(root, ocean):
+    directory = root / "data/processed"
+    for h in ("north", "south"):
+        with xr.open_dataset(directory / f"{h}_surface.nc") as b:
+            hfield = (
+                b.H.where(extratropics(ocean, h).ocean == 1)
+                .fillna(80.0)
+                .where(extratropics(ocean, h).ocean == 1)
+            )
+            hfield = hfield * 1.5
+            candidate = xr.Dataset(
+                {
+                    "H": hfield,
+                    "baseline_input_valid": b.input_valid.load(),
+                    "era5_ocean": extratropics(ocean, h).ocean,
+                    "support_method": xr.where(np.isfinite(hfield), 1, 0),
+                },
+                attrs={
+                    "prepared_by": "ssta_model.data.era5_h_candidate",
+                    "baseline_sha256": checksum(directory / f"{h}_surface.nc"),
+                    "target_mask_sha256": checksum(directory / "era5_ocean_mask.nc"),
+                },
+            )
+            candidate.H.attrs["units"] = "m"
+            candidate.to_netcdf(directory / f"{h}_surface_h_era5_bilinear.nc")
+
+
+def test_depth_variant_selection_preserves_authorised_mask_and_rejects_bad_candidate(
+    experiment,
+):
+    from ssta_model.data.runtime import load_hemisphere
+
+    root, path, ocean, _ = experiment
+    candidate_fixture(root, ocean)
+    directory = root / "data/processed"
+    config = load_configuration(path, root)
+    assert config["mixed_layer_depth"]["variant"] == "baseline"
+    path.write_text(
+        path.read_text() + '\n[mixed_layer_depth]\nvariant="era5_bilinear"\n'
+    )
+    assert (
+        load_configuration(path, root)["mixed_layer_depth"]["variant"]
+        == "era5_bilinear"
+    )
+    baseline = load_hemisphere(directory, "north", ocean)
+    selected = load_hemisphere(directory, "north", ocean, "era5_bilinear")
+    np.testing.assert_array_equal(
+        baseline["surface"].input_valid, selected["surface"].input_valid
+    )
+    assert (
+        np.isfinite(selected["surface"].H.values[1, 0])
+        and selected["surface"].input_valid.values[1, 0] == 0
+    )
+    assert np.isnan(baseline["surface"].H.values[1, 0])
+    assert selected["surface"].H.values[1, 1] == 75
+    filename = directory / "north_surface_h_era5_bilinear.nc"
+    with xr.open_dataset(filename) as ds:
+        good = ds.load()
+    for change in ("units", "coordinates", "missing", "zero", "mask", "checksum"):
+        bad = good.copy(deep=True)
+        if change == "units":
+            bad.H.attrs["units"] = "K"
+        elif change == "coordinates":
+            bad = bad.assign_coords(longitude=bad.longitude + 0.25)
+        elif change == "missing":
+            bad.H.values[1, 1] = np.nan
+        elif change == "zero":
+            bad.H.values[1, 1] = 0
+        elif change == "mask":
+            bad.baseline_input_valid.values[1, 1] = 0
+        else:
+            bad.attrs["baseline_sha256"] = "invalid"
+        bad.to_netcdf(filename, mode="w")
+        with pytest.raises(ValueError):
+            load_hemisphere(directory, "north", ocean, "era5_bilinear")
+
+
+@pytest.mark.parametrize("variant", ["baseline", "era5_bilinear"])
+def test_both_depth_variants_recover_original_independent_update_with_zero_diffusion(
+    experiment, variant
+):
+    root, path, ocean, _ = experiment
+    candidate_fixture(root, ocean)
+    text = (
+        path.read_text()
+        .replace(
+            "surface_damping=true", "surface_damping=true\nhorizontal_diffusion=false"
+        )
+        .replace("rho_kg_m3=1025.0", "rho_kg_m3=1025.0\nkappa_m2_s=1000.0")
+        + f'\n[mixed_layer_depth]\nvariant="{variant}"\n'
+    )
+    path.write_text(text)
+    baseline = run_experiment(path, root)
+    path.write_text(
+        text.replace("horizontal_diffusion=false", "horizontal_diffusion=true")
+        .replace("kappa_m2_s=1000.0", "kappa_m2_s=0.0")
+        .replace('directory="runs/test"', 'directory="runs/zero"')
+    )
+    result = run_experiment(path, root)
+    for h in ("north", "south"):
+        assert (
+            baseline["hemispheres"][h]["monthly"] == result["hemispheres"][h]["monthly"]
+        )
+    path.write_text(
+        text.replace("horizontal_diffusion=false", "horizontal_diffusion=true")
+        .replace("surface_forcing=true", "surface_forcing=false")
+        .replace("surface_damping=true", "surface_damping=false")
+        .replace("temperature_anomaly_k=0.0", "temperature_anomaly_k=2.0")
+        .replace('directory="runs/test"', 'directory="runs/uniform"')
+    )
+    uniform = run_experiment(path, root)
+    for h in ("north", "south"):
+        assert uniform["hemispheres"][h]["minimum_k"] == pytest.approx(2, abs=1e-12)
+        assert uniform["hemispheres"][h]["maximum_k"] == pytest.approx(2, abs=1e-12)
+
+
+def test_selected_depth_validates_polar_retention(experiment):
+    from ssta_model.data.runtime import load_hemisphere
+
+    root, path, ocean, _ = experiment
+    directory = root / "data/processed"
+    ocean = ocean.assign_coords(latitude=[90.0, 20.0, 0.0, -20.0, -40.0])
+    ocean.to_netcdf(directory / "era5_ocean_mask.nc", mode="w")
+    for kind in ("surface", "regression"):
+        p = directory / f"north_{kind}.nc"
+        with xr.open_dataset(p) as ds:
+            changed = ds.load().assign_coords(latitude=[90.0, 20.0])
+        changed.to_netcdf(p, mode="w")
+    # Baseline H must remain exactly unchanged for the limited polar exception.
+    candidate_fixture(root, ocean)
+    p = directory / "north_surface_h_era5_bilinear.nc"
+    with xr.open_dataset(p) as ds:
+        candidate = ds.load()
+    with xr.open_dataset(directory / "north_surface.nc") as ds:
+        baseline = ds.load()
+    polar = np.broadcast_to(
+        candidate.latitude.values[:, None] > 89.5, candidate.H.shape
+    )
+    active = candidate.baseline_input_valid.values == 1
+    candidate.H.values[polar] = np.where(
+        active[polar], baseline.H.values[polar], np.nan
+    )
+    candidate.support_method.values[polar] = np.where(active[polar], 2, 0)
+    candidate.to_netcdf(p, mode="w")
+    load_hemisphere(directory, "north", ocean, "era5_bilinear")
+    candidate.H.values[0, 2] += 1
+    candidate.to_netcdf(p, mode="w")
+    with pytest.raises(ValueError, match="polar H"):
+        load_hemisphere(directory, "north", ocean, "era5_bilinear")

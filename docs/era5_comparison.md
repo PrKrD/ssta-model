@@ -97,6 +97,15 @@ and both sensitivity summaries.
 
 ## Controlled diffusion comparison and half-degree display
 
+The later [controlled H sensitivity](h_sensitivity.md) compares original-H and
+bilinear-H diffusion experiments on identical active masks, initial fields,
+months, forcing and numerical/physical parameters. Its primary effect is
+bilinear-H SSTA minus original-H diffusion SSTA. The current v3 viewer/export
+adds this experiment and both static H layers, with shared H limits and access
+to the no-diffusion baseline. Use `experiments/compare_bilinear_h.py` for current
+analysis/export. The earlier diffusion-only comparison below remains a separate
+record; its legacy v2 export is not the current viewer contract.
+
 The new [diffusion experiment](surface_flux_model.md) adds only conservative
 horizontal diffusion with kappa=1000 m2 s-1. Forcing, damping, fixed H, initial
 fields, masks and month labels match the preserved baseline. Both models are

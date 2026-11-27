@@ -8,6 +8,12 @@ experiment; the runner refuses existing output directories. No run manager exist
 - `historical_surface_flux_with_diffusion/`: separate experiment with conservative
   kappa=1000 m2 s-1 diffusion and otherwise identical inputs/masks/initialization.
 - `historical_surface_flux_diffusion_check/`: short actual-data solve verification.
+- `historical_surface_flux_bilinear_h/`: separate controlled H-only sensitivity,
+  with the same observed initial state and 506881 active cells as the original-H
+  diffusion run. `comparison/` contains C/B/A/ERA5 metrics, H-effect CSVs,
+  lag-one regional persistence, native global/North Atlantic maps and shared-scale
+  variability/series figures. `historical_surface_flux_bilinear_h_check/` is its
+  short actual-data verification. See [H sensitivity](../docs/h_sensitivity.md).
 - `h_rebuild_comparison/`: preparation-only H/mask statistics, four static
   comparison figures and preservation/provenance report. No historical rerun;
   proposed processed H remains separate. See [H comparison](../docs/h_rebuild.md).

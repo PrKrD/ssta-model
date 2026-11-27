@@ -1,5 +1,13 @@
 # Experiment configurations
 
+[historical_surface_flux_bilinear_h.toml](historical_surface_flux_bilinear_h.toml)
+selects `mixed_layer_depth.variant="era5_bilinear"` for the controlled H-only
+sensitivity. The default `baseline` variant preserves older configurations.
+All forcing/damping/diffusion/initialisation/solver settings match the original-H
+diffusion experiment. The loader validates the original complete input mask,
+then selects existing candidate H without activating its additional finite cells.
+No candidate regeneration or raw MLD reading occurs. See [experiment](../docs/h_sensitivity.md).
+
 [surface_damping.toml](surface_damping.toml) is the unchanged provisional global
 coefficient, 16.072239642825945 W m-2 K-1. Its original calibration provenance is
 in local `data/processed/manifest.json`. Do not regenerate it or restore removed

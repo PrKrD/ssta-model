@@ -15,7 +15,7 @@ from ssta_model.analysis.era5_comparison import (
 from ssta_model.data.model_inputs import require, same_grid
 
 
-def validate_controlled_pair(diffusion, baseline):
+def validate_controlled_pair(diffusion, baseline, *, same_depth=True):
     same_grid(diffusion, baseline)
     require(
         np.array_equal(diffusion.forcing_month, baseline.forcing_month),
@@ -29,9 +29,11 @@ def validate_controlled_pair(diffusion, baseline):
         np.array_equal(diffusion.input_valid, baseline.input_valid),
         "Controlled masks differ",
     )
-    require(
-        np.array_equal(diffusion.H, baseline.H, equal_nan=True), "Controlled H differs"
-    )
+    if same_depth:
+        require(
+            np.array_equal(diffusion.H, baseline.H, equal_nan=True),
+            "Controlled H differs",
+        )
     require(
         np.array_equal(
             diffusion.initial_sst_anomaly, baseline.initial_sst_anomaly, equal_nan=True

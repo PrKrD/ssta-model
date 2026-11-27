@@ -14,6 +14,9 @@ The later `north_surface_h_era5_bilinear.nc` and `south_surface_h_era5_bilinear.
 are [ERA5-targeted candidates](../docs/h_era5_candidate.md), recomputed directly
 from the source with a limited polar baseline exception. They include copied
 baseline masks for comparison and do not replace runtime surface files.
+The [controlled H sensitivity](../docs/h_sensitivity.md) selects those existing
+ERA5-targeted products explicitly, preserving the validated original active mask;
+no reconstruction or raw MLD reading is part of simulation execution.
 The preparation documentation below records the original workflow; its
 regeneration command requires separately available originals.
 During preparation, the seven files used their original names under `raw/`.

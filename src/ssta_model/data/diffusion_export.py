@@ -1,4 +1,4 @@
-"""Five monthly SST comparison layers and one separate static fixed-H field."""
+"""Static SST comparisons, extended to controlled H sensitivity and two H fields."""
 
 import hashlib
 import json
@@ -10,6 +10,7 @@ import xarray as xr
 
 from ssta_model.analysis.diffusion_comparison import validate_controlled_pair
 from ssta_model.analysis.era5_comparison import aligned_months
+from ssta_model.analysis.h_sensitivity import effect_fields, validate_h_pair
 from ssta_model.data.comparison_export import comparison_bins
 from ssta_model.data.model_inputs import require, same_grid
 from ssta_model.data.prepare import checksum
@@ -29,10 +30,27 @@ def aggregate_fields(fields, area, valid, bins):
     return np.stack(result)
 
 
-def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
+def h_comparison_layers(means):
+    """C, B, ERA5, C−ERA5, C−B, A; physical values never rescaled."""
+    return np.stack(
+        [
+            means[0],
+            means[1],
+            means[2],
+            means[0] - means[2],
+            effect_fields(means[0], means[1]),
+            means[3],
+        ]
+    )
+
+
+def export_comparison(
+    run_dir, processed_dir, destination, *, baseline_dir, original_h_dir=None
+):
     run_dir, processed_dir, destination, baseline_dir = map(
         Path, (run_dir, processed_dir, destination, baseline_dir)
     )
+    sensitivity = original_h_dir is not None
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "frames").mkdir(exist_ok=True)
     (run_dir / "comparison").mkdir(exist_ok=True)
@@ -41,6 +59,7 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
         bins = {}
         valid = {}
         h_valid = {}
+        original_valid = {}
         source_hashes = {}
         reference = None
         for h in ("north", "south"):
@@ -51,7 +70,24 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
                 processed_dir / f"{h}_surface.nc",
             ]
             d, b, e, s = [stack.enter_context(xr.open_dataset(p)) for p in paths]
-            validate_controlled_pair(d, b)
+            if sensitivity:
+                extra_paths = [
+                    Path(original_h_dir) / f"{h}_sst.nc",
+                    processed_dir / f"{h}_surface_h_era5_bilinear.nc",
+                ]
+                o, c = [stack.enter_context(xr.open_dataset(p)) for p in extra_paths]
+                paths.extend(extra_paths)
+                validate_h_pair(d, o)
+                validate_controlled_pair(o, b)
+                same_grid(d, c)
+                require(c.H.attrs.get("units") == "m", "Candidate display H units")
+                require(
+                    np.array_equal(c.H, d.H, equal_nan=True),
+                    "Display H differs from integrated H",
+                )
+            else:
+                validate_controlled_pair(d, b)
+                o, c = d, s
             same_grid(d, e)
             same_grid(d, s)
             require(s.H.attrs.get("units") == "m", "H must be metres")
@@ -60,10 +96,13 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
             if reference is not None:
                 require(months == reference, "Hemisphere months differ")
             reference = months
-            datasets[h] = (d, b, e, s, aligned)
+            datasets[h] = (d, b, e, s, aligned, o, c)
             bins[h] = comparison_bins(d.latitude.values, d.longitude.values)
             valid[h] = d.input_valid.values == 1
-            h_valid[h] = np.isfinite(s.H.values) & (s.H.values > 0)
+            original_valid[h] = np.isfinite(s.H.values) & (s.H.values > 0)
+            h_valid[h] = original_valid[h] | (
+                np.isfinite(c.H.values) & (c.H.values > 0)
+            )
             for p in paths:
                 source_hashes[str(p)] = checksum(p)
         # Include H-only coastal tiles. SST is missing there, never filled from H or ERA5.
@@ -83,15 +122,29 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
             for k in occupied
         ]
         depth = np.full(259200, np.nan)
-        for h, (d, b, e, s, aligned) in datasets.items():
+        original_depth = np.full(259200, np.nan)
+        for h, (d, b, e, s, aligned, o, c) in datasets.items():
             values = aggregate_fields(
-                [s.H.values.astype(float)], d.cell_area.values, h_valid[h], bins[h]
+                [c.H.values.astype(float)],
+                d.cell_area.values,
+                np.isfinite(c.H.values) & (c.H.values > 0),
+                bins[h],
             )[0]
             use = np.isfinite(values)
             depth[use] = values[use]
+            original = aggregate_fields(
+                [s.H.values.astype(float)],
+                d.cell_area.values,
+                original_valid[h],
+                bins[h],
+            )[0]
+            original_depth[np.isfinite(original)] = original[np.isfinite(original)]
         depth_values = depth[occupied]
         depth_content = depth_values.astype("<f4").tobytes()
         (destination / "depth.bin").write_bytes(depth_content)
+        original_content = original_depth[occupied].astype("<f4").tobytes()
+        if sensitivity:
+            (destination / "depth_original.bin").write_bytes(original_content)
         groups = {name: [] for name in ("sst", "difference", "effect")}
         extrema = {name: [np.inf, -np.inf] for name in groups}
         frames = []
@@ -102,11 +155,12 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
         checks = 0
         max_storage_error = 0.0
         for index, month in enumerate(reference):
-            combined = np.full((5, 259200), np.nan)
-            for h, (d, b, e, s, aligned) in datasets.items():
+            combined = np.full((6 if sensitivity else 5, 259200), np.nan)
+            for h, (d, b, e, s, aligned, o, c) in datasets.items():
                 if index == 0:
                     dv = d.initial_sst_anomaly.values
                     bv = b.initial_sst_anomaly.values
+                    ov = o.initial_sst_anomaly.values
                     j = int(
                         np.flatnonzero(
                             e.time.values.astype("datetime64[M]")
@@ -117,11 +171,25 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
                     i, j, _ = aligned[index - 1]
                     dv = d.sst_anomaly.isel(time=i).values.astype(float)
                     bv = b.sst_anomaly.isel(time=i).values.astype(float)
+                    ov = o.sst_anomaly.isel(time=i).values.astype(float)
                 ev = e.sst_anomaly.isel(time=j).values.astype(float)
                 area = d.cell_area.values
-                means = aggregate_fields([dv, bv, ev], area, valid[h], bins[h])
-                values = np.concatenate(
-                    (means, (means[0] - means[2])[None], (means[0] - means[1])[None])
+                means = aggregate_fields(
+                    [dv, ov, ev, bv] if sensitivity else [dv, bv, ev],
+                    area,
+                    valid[h],
+                    bins[h],
+                )
+                values = (
+                    h_comparison_layers(means)
+                    if sensitivity
+                    else np.concatenate(
+                        (
+                            means,
+                            (means[0] - means[2])[None],
+                            (means[0] - means[1])[None],
+                        )
+                    )
                 )
                 use = np.isfinite(values[0])
                 combined[:, use] = values[:, use]
@@ -145,8 +213,14 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
                             & np.isfinite(dv)
                             & np.isfinite(bv)
                             & np.isfinite(ev)
+                            & np.isfinite(ov)
                         )
-                        for layer, field in enumerate((dv, bv, ev, dv - ev, dv - bv)):
+                        fields = (
+                            (dv, ov, ev, dv - ev, dv - ov, bv)
+                            if sensitivity
+                            else (dv, bv, ev, dv - ev, dv - bv)
+                        )
+                        for layer, field in enumerate(fields):
                             error = abs(
                                 np.average(field[select], weights=area[select])
                                 - values[layer, key]
@@ -159,7 +233,14 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
                             )
             display = combined[:, occupied]
             for name, values in zip(
-                groups, (display[:3].ravel(), display[3], display[4])
+                groups,
+                (
+                    display[[0, 1, 2, 5]].ravel()
+                    if sensitivity
+                    else display[:3].ravel(),
+                    display[3],
+                    display[4],
+                ),
             ):
                 finite = values[np.isfinite(values)]
                 if finite.size:
@@ -200,7 +281,14 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
                     flush=True,
                 )
         populations = {k: sorted([*v, *extrema[k]]) for k, v in groups.items()}
-        populations["depth"] = sorted(depth_values[np.isfinite(depth_values)].tolist())
+        depth_population = (
+            np.r_[depth_values, original_depth[occupied]]
+            if sensitivity
+            else depth_values
+        )
+        populations["depth"] = sorted(
+            depth_population[np.isfinite(depth_population)].tolist()
+        )
         manifest = {
             "format": "sst-comparison-f32-v2",
             "grid": {"id": "diffusion-comparison-0.5deg", "cells": cells},
@@ -220,6 +308,20 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
             "percentile_sampling": "SST/difference samples every 1024 finite values with rotating monthly offset plus extrema; static H uses every occupied tile. Display colours only; values unchanged.",
             "depth_source_doi": "https://doi.org/10.17882/91774",
         }
+        if sensitivity:
+            manifest.update(
+                {
+                    "format": "sst-comparison-f32-v3",
+                    "staticOriginalDepth": {
+                        "file": "depth_original.bin",
+                        "sha256": hashlib.sha256(original_content).hexdigest(),
+                    },
+                    "description": "Controlled H sensitivity · 0.5° common-area aggregates · unchanged active domain, forcing, damping and κ=1000 m²/s. All model and ERA5 SSTA share fixed colour limits. Retrospective comparison.",
+                    "depthDescription": "Bilinear fixed H (m) · de Boyer Montégut (2023) maximum monthly 1° climatology, source mask==1, periodic mask-aware bilinear on ERA5 ocean. Original H retained beyond ±89.5° only at baseline active cells. Interpolation adds no observational resolution. Not animated.",
+                    "originalDepthDescription": "Original fixed H (m) · de Boyer Montégut (2023) maximum monthly 1° climatology, containing-cell mapping on ERA5 ocean. Not animated. Same colour limits as bilinear H.",
+                    "encoding": "Little-endian float32; six layer-major arrays: bilinear H model, original H diffusion model, ERA5, bilinear−ERA5, bilinear−original, original H no-diffusion model. Two separate static H arrays; NaN missing.",
+                }
+            )
         (destination / "manifest.json").write_text(
             json.dumps(manifest, separators=(",", ":"), allow_nan=False) + "\n"
         )
@@ -231,6 +333,7 @@ def export_comparison(run_dir, processed_dir, destination, *, baseline_dir):
         "monthly_binary_bytes": size,
         "manifest_bytes": (destination / "manifest.json").stat().st_size,
         "static_depth_bytes": len(depth_content),
+        "static_original_depth_bytes": len(original_content) if sensitivity else 0,
         "independent_coordinate_checks": checks,
         "maximum_aggregation_error_k": max_error,
         "maximum_float32_storage_error_k": max_storage_error,
