@@ -5,6 +5,14 @@ configurations, write generated outputs to `runs/`, and preserve the full
 no-diffusion baseline under `runs/historical_surface_flux_era5_initialised/`.
 The synthetic and completed 1979–1980 demonstrations have been retired.
 
+## ERA5-targeted H candidate (no SST integration)
+
+`python experiments/finalise_h_candidate.py` recomputes source bilinear H using
+ERA5 ocean as the target mask, with exact baseline retention only beyond ±89.5°
+on existing active ocean cells. It saves separate candidate files and static
+coverage/difference diagnostics, including explicit unsupported-cell coordinates.
+No runtime mask or H is selected/replaced; see [methods and domain caveats](../docs/h_era5_candidate.md).
+
 ## Proposed H rebuild (no SST integration)
 
 `python experiments/rebuild_h_field.py` uses only the reuploaded local MLD file

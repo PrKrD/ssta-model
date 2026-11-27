@@ -29,6 +29,8 @@ independently verified winter-depth selection and never evolves seasonally.
 A [separate proposed H rebuild](h_rebuild.md) now compares the source-mask-based
 bilinear alternative with this baseline. Neither saved historical experiment has
 been rerun with that field. Runtime H/mask selection remains unchanged.
+The [ERA5-targeted candidate](h_era5_candidate.md) is a later preparation-only
+alternative with explicit active-domain validation and polar baseline retention.
 
 The diffusion experiment uses kappa=1000 m2 s-1, a provisional constant eddy
 diffusivity, not a fit to ERA5. rho=1025 and cp=3990 remain configuration choices.

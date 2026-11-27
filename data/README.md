@@ -10,6 +10,10 @@ the isolated [H/mask rebuild comparison](../docs/h_rebuild.md); no other origina
 input is restored or required. Proposed `north_surface_h_bilinear.nc`,
 `south_surface_h_bilinear.nc` and `mld_mask_remapped.nc` under `processed/` are
 separate from the preserved baseline and are not selected by the scientific model.
+The later `north_surface_h_era5_bilinear.nc` and `south_surface_h_era5_bilinear.nc`
+are [ERA5-targeted candidates](../docs/h_era5_candidate.md), recomputed directly
+from the source with a limited polar baseline exception. They include copied
+baseline masks for comparison and do not replace runtime surface files.
 The preparation documentation below records the original workflow; its
 regeneration command requires separately available originals.
 During preparation, the seven files used their original names under `raw/`.

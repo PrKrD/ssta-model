@@ -27,6 +27,9 @@ solver registry is introduced.
   `mld_rebuild.py` is a separate, explicitly invoked preparation workflow for
   proposed bilinear H and remapped source-mask comparisons. It preserves selected
   runtime products and never integrates SST; see [H rebuild](h_rebuild.md).
+  `era5_h_candidate.py` reuses its source/interpolation kernels with the ERA5
+  target mask and restricted polar retention; [candidate validation](h_era5_candidate.md)
+  stays separate from runtime input/domain selection.
 - [analysis](../src/ssta_model/analysis/) owns paired ERA5 metrics, regional series,
   native scientific figures, and the controlled with/without-diffusion comparison.
   Model and ERA5 comparisons use common finite ocean support. Analysis does not

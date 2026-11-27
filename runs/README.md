@@ -11,6 +11,9 @@ experiment; the runner refuses existing output directories. No run manager exist
 - `h_rebuild_comparison/`: preparation-only H/mask statistics, four static
   comparison figures and preservation/provenance report. No historical rerun;
   proposed processed H remains separate. See [H comparison](../docs/h_rebuild.md).
+- `h_era5_bilinear_candidate/`: ERA5-targeted H candidate report, coverage and
+  gradient statistics, unsupported-cell CSV and four native comparison maps.
+  No SST integration; see [candidate domain checks](../docs/h_era5_candidate.md).
 
 Each historical run stores separate north/south compressed NetCDF with
 `sst_anomaly(time,latitude,longitude)` (K), original coordinates, fixed H, native

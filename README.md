@@ -15,6 +15,8 @@ and 24-month demonstrations have been retired.
 A separate [H/mask rebuild comparison](docs/h_rebuild.md) uses the reuploaded MLD
 source and the old mask-aware bilinear method. It produces proposed fields and
 static diagnostics only; the selected H, ERA5 mask and historical runs are unchanged.
+The [final ERA5-targeted H candidate](docs/h_era5_candidate.md) recomputes bilinear
+H on ERA5 ocean with limited polar baseline retention and explicit domain checks.
 
 ## Development and execution
 

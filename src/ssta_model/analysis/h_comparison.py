@@ -39,13 +39,13 @@ def compare_depths(current, rebuilt, area):
     }
 
 
-def plot_comparison(baseline, proposed, masks, directory):
+def plot_depth_comparison(
+    baseline, proposed, directory, target_label="remapped MLD ocean domain"
+):
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.colors import BoundaryNorm, ListedColormap
-    from matplotlib.patches import Patch
 
     current = xr.full_like(proposed.H, np.nan)
     for field in baseline:
@@ -88,7 +88,7 @@ def plot_comparison(baseline, proposed, masks, directory):
             (current, rebuilt, difference),
             (
                 "Current H · containing source cell · ERA5 ocean domain",
-                "Proposed H · mask-aware bilinear · remapped MLD ocean domain",
+                f"Proposed H · mask-aware bilinear · {target_label}",
                 "Proposed minus current · common finite support only",
             ),
         ):
@@ -112,6 +112,34 @@ def plot_comparison(baseline, proposed, masks, directory):
         )
         fig.savefig(directory / f"{name}.png", dpi=170)
         plt.close(fig)
+
+
+def plot_comparison(baseline, proposed, masks, directory):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import BoundaryNorm, ListedColormap
+    from matplotlib.patches import Patch
+
+    plot_depth_comparison(baseline, proposed, directory)
+
+    def draw(field, ax, bounds, **options):
+        field = (
+            field.assign_coords(longitude=(field.longitude + 180) % 360 - 180)
+            .sortby("longitude")
+            .sortby("latitude")
+        )
+        ax.pcolormesh(
+            field.longitude, field.latitude, field, shading="nearest", **options
+        )
+        ax.set(
+            xlim=bounds[:2],
+            ylim=bounds[2:],
+            xlabel="Longitude (° east)",
+            ylabel="Latitude (° north)",
+        )
+
     colours = ["#d0d0d0", "#e58635", "#973cb3", "#237ca9"]
     cmap = ListedColormap(colours)
     norm = BoundaryNorm(np.arange(-0.5, 4), 4)

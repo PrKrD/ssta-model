@@ -1,5 +1,9 @@
 # Proposed bilinear fixed H and ocean-mask comparison
 
+The later [ERA5-targeted candidate](h_era5_candidate.md) recomputes interpolation
+with the ERA5 target mask and a restricted polar baseline exception. The original
+MLD-target products documented here remain unchanged for comparison.
+
 This preparation-only milestone adds an alternative to the existing containing-cell
 H. **Neither historical SST experiment has been rerun with the alternative.** The
 ERA5 mask, selected runtime surface products, damping, forcing and Cesium exports
