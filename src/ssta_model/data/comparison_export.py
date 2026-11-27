@@ -34,3 +34,17 @@ def aggregate_pair(model, era, area, valid, bins):
         np.divide(total, weights, out=means, where=weights > 0)
         result.append(means)
     return np.stack([*result, result[0] - result[1]])
+
+
+def aggregate_fields(fields, area, valid, bins):
+    """One common finite support for every supplied field, including difference signs."""
+    use = valid & np.logical_and.reduce([np.isfinite(f) for f in fields])
+    require(np.all(np.isfinite(area[use]) & (area[use] > 0)), "Invalid display areas")
+    weight = np.bincount(bins[use], weights=area[use], minlength=259200)
+    result = []
+    for field in fields:
+        total = np.bincount(bins[use], weights=field[use] * area[use], minlength=259200)
+        value = np.full(259200, np.nan)
+        np.divide(total, weight, out=value, where=weight > 0)
+        result.append(value)
+    return np.stack(result)

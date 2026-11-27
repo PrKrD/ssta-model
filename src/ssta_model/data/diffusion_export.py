@@ -1,4 +1,4 @@
-"""Static SST comparisons, extended to controlled H sensitivity and two H fields."""
+"""Archived multi-experiment display export; active viewer uses historical_export."""
 
 import hashlib
 import json
@@ -11,23 +11,9 @@ import xarray as xr
 from ssta_model.analysis.diffusion_comparison import validate_controlled_pair
 from ssta_model.analysis.era5_comparison import aligned_months
 from ssta_model.analysis.h_sensitivity import effect_fields, validate_h_pair
-from ssta_model.data.comparison_export import comparison_bins
+from ssta_model.data.comparison_export import aggregate_fields, comparison_bins
 from ssta_model.data.model_inputs import require, same_grid
 from ssta_model.data.prepare import checksum
-
-
-def aggregate_fields(fields, area, valid, bins):
-    """One common finite support for every supplied field, including difference signs."""
-    use = valid & np.logical_and.reduce([np.isfinite(f) for f in fields])
-    require(np.all(np.isfinite(area[use]) & (area[use] > 0)), "Invalid display areas")
-    weight = np.bincount(bins[use], weights=area[use], minlength=259200)
-    result = []
-    for field in fields:
-        total = np.bincount(bins[use], weights=field[use] * area[use], minlength=259200)
-        value = np.full(259200, np.nan)
-        np.divide(total, weight, out=value, where=weight > 0)
-        result.append(value)
-    return np.stack(result)
 
 
 def h_comparison_layers(means):

@@ -1,89 +1,61 @@
-# Historical research experiments
+# Scientific commands
 
-## Controlled bilinear-H historical experiment
+Reusable calculations live in `ssta_model`; scripts are thin. Existing processed
+scientific inputs and all tracked experiment configurations remain available.
 
-After controlled tests and a short actual-data check, run the separate
-`configs/historical_surface_flux_bilinear_h.toml` configuration with
-`run_historical_surface_flux.py --config ...`. Analyse/export with
-`python experiments/compare_bilinear_h.py --stage all`. The current Cesium default
-is this H-sensitivity comparison, including original-H diffusion, no-diffusion,
-ERA5, differences and both static H fields. Existing A/B runs and processed H
-products remain unchanged. See [full commands and validation](../docs/h_sensitivity.md).
+## Active primary model and viewer
 
-Reusable science lives in `ssta_model`; entry scripts remain thin. Track
-configurations, write generated outputs to `runs/`, and preserve the full
-no-diffusion baseline under `runs/historical_surface_flux_era5_initialised/`.
-The synthetic and completed 1979–1980 demonstrations have been retired.
-
-## ERA5-targeted H candidate (no SST integration)
-
-`python experiments/finalise_h_candidate.py` recomputes source bilinear H using
-ERA5 ocean as the target mask, with exact baseline retention only beyond ±89.5°
-on existing active ocean cells. It saves separate candidate files and static
-coverage/difference diagnostics, including explicit unsupported-cell coordinates.
-No runtime mask or H is selected/replaced; see [methods and domain caveats](../docs/h_era5_candidate.md).
-
-## Proposed H rebuild (no SST integration)
-
-`python experiments/rebuild_h_field.py` uses only the reuploaded local MLD file
-and current processed grid/baseline fields. It saves separate proposed bilinear
-H, remaps the original source mask by spherical overlap, compares it explicitly
-with ERA5, and writes static figures/report under `runs/h_rebuild_comparison/`.
-Install the existing `visualization` extra. No model rerun or selected-input
-replacement occurs. See [methods, output paths and reproduction](../docs/h_rebuild.md).
-
-## Diffusion experiment
-
-Install dependencies and verify the operator before running:
+The default historical runner configuration is
+[bilinear H with diffusion](../configs/historical_surface_flux_bilinear_h.toml).
+The existing `runs/historical_surface_flux_bilinear_h/` is complete and preserved;
+do not rerun integration for display. Export from its saved outputs and processed
+ERA5/H only:
 
 ```sh
-python -m pip install -e ".[dev,visualization]"
-python -m pytest
-ruff check .
-ruff format --check .
+python experiments/export_historical_viewer.py
 ```
 
-The full [configuration](../configs/historical_surface_flux_with_diffusion.toml)
-uses January 1979 ERA5 initialization, February 1979–October 2026 forcing,
-kappa=1000 m2 s-1, unchanged damping, fixed H, and explicit solver tolerances.
-For a short actual-data check, copy it, set end_month to 1979-04 and choose a
-separate output directory; never overwrite the baseline or full diffusion run.
-The resolved short-check configuration and numerical diagnostics are kept in
-`runs/historical_surface_flux_diffusion_check/`.
+The destination defaults to `frontend/public/data/era5_comparison/` and must not
+exist. Use `--destination runs/historical_display_next` to prepare a replacement
+for validation before swapping assets. No H, forcing or ERA5 preparation occurs.
+See [viewer contract](../frontend/README.md) and [retirement](../docs/historical_retirement.md).
 
-After the controlled tests and short check pass, run the full experiment:
+To reproduce a scientific integration deliberately, choose a new output directory
+in a copy of the tracked configuration, then run:
 
 ```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python experiments/run_historical_surface_flux.py
-python experiments/compare_diffusion.py --stage analyse
-python experiments/compare_diffusion.py --stage export
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python experiments/run_historical_surface_flux.py --config PATH
 ```
 
-The thread variables avoid excess BLAS threading overhead, not parallelise the
-model. The runner defaults to the diffusion configuration; `--config PATH` and
-`--root PATH` remain available. Existing run directories are protected against
-overwrite. Changing kappa or disabling diffusion requires a separate configuration
-and output directory. A disabled switch or kappa=0 uses the original independent-cell
-backward Euler path. The [no-diffusion configuration](../configs/historical_surface_flux_era5_initialised.toml)
-remains available for fresh reproductions, not overwriting the preserved baseline.
+The runner refuses existing outputs. Test with pytest/Ruff and a short
+actual-data solve before a long integration. Thread settings avoid BLAS overhead;
+physics, conservation and solver tolerances stay in the scientific package.
 
-`compare_diffusion.py --stage all` performs analysis/export only; it does not
-rerun integration. It checks identical grids, masks, initial fields and months,
-then compares both models with ERA5, calculates diffusion-minus-baseline effects,
-and generates native H/SST/variability maps and regional/hemispheric series.
-The export writes five monthly SST arrays and separate static H at 0.5-degree
-resolution. Launch from `frontend/` with `npm run dev`; export before building.
+## Archived sensitivity workflows
 
-## Existing SST preparation and baseline
+Original containing-cell H with and without diffusion are retired from local
+native storage and the active viewer. Their configurations and all numerical
+implementations remain reproducible. Summaries, model–ERA5 metrics, monthly CSVs,
+provenance and unique scientific figures are archived locally under
+`runs/archived_historical_sensitivity/`. [Recorded conclusions](../docs/historical_retirement.md)
+explain their limitations. Short completed check outputs were also retired after
+preserving validation records.
 
-`compare_era5_sst.py` retains `prepare`, `run`, `analyse` and `all` stages for the
-original historical ERA5 reference workflow. Preparation requires the newly
-supplied SST and refuses existing products; it does not invoke the removed-raw
-atmospheric/MLD workflow. Do not repeat preparation for visualization, change the
-1979–2025 climatology, recalculate H or recalibrate damping. New static exports
-are produced only by `compare_diffusion.py`.
+`compare_bilinear_h.py --stage analyse` requires reproduced A/B/C native runs.
+`compare_diffusion.py --stage analyse` requires reproduced A/B. Their `export`
+stages produce only archived old-format assets under
+`runs/archived_historical_sensitivity/`, never the current viewer. The original
+`compare_era5_sst.py` retains its explicitly invoked preparation/run/analysis stages
+for reproducing the no-diffusion reference. These are archived research commands,
+not prerequisites for the current application. Original-H processed inputs remain
+required by runtime validation and those configurations.
 
-See [surface/diffusion equations](../docs/surface_flux_model.md),
-[ERA5 comparison definitions](../docs/era5_comparison.md),
-[frontend usage](../frontend/README.md) and [output conventions](../runs/README.md).
-Numerical conservation/convergence is distinct from physical agreement with ERA5.
+## Input/H preparation (not run for viewing)
+
+`finalise_h_candidate.py` prepares ERA5-targeted bilinear H from the original MLD
+source with limited baseline polar retention. `rebuild_h_field.py` prepares the
+old-mask comparison and static diagnostics. Both are separate from integration;
+see [candidate provenance](../docs/h_era5_candidate.md) and
+[H reconstruction](../docs/h_rebuild.md). Existing processed H/mask comparison
+products, original raw MLD and ERA5 SST are preserved. Do not recalculate H,
+climatology, forcing regressions or damping simply to regenerate the viewer.

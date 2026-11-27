@@ -10,6 +10,7 @@ from ssta_model.data.diffusion_export import export_comparison
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", choices=("analyse", "export", "all"), default="all")
+    parser.epilog = "Archived sensitivity workflow: reproduce retired native runs before use. Active viewer: export_historical_viewer.py."
     args = parser.parse_args()
     run = Path("runs/historical_surface_flux_bilinear_h")
     original = Path("runs/historical_surface_flux_with_diffusion")
@@ -21,7 +22,7 @@ def main():
         export_comparison(
             run,
             processed,
-            Path("frontend/public/data/era5_comparison"),
+            Path("runs/archived_historical_sensitivity/compare_bilinear_h_display"),
             baseline_dir=baseline,
             original_h_dir=original,
         )

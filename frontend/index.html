@@ -3,24 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SSTA Model · Field viewer</title>
+    <title>SSTA Model · SST anomalies</title>
   </head>
   <body>
     <main id="app">
       <div id="globe" aria-label="Interactive numerical field globe"></div>
       <aside class="panel" aria-label="Field information and color controls">
         <p id="badge" class="badge">LOADING DATASET</p>
-        <h1 id="dataset-name">Global field viewer</h1>
+        <h1 id="dataset-name">SST anomaly model</h1>
         <label id="comparison-control" class="control" hidden>Dataset
           <select id="comparison-layer" aria-label="Comparison dataset">
-            <option value="bilinear">Model SSTA — Bilinear H + diffusion</option>
-            <option value="with_diffusion">Model SSTA — Original H + diffusion</option>
+            <option value="model">Model SSTA</option>
             <option value="era5">ERA5 SSTA</option>
-            <option value="difference">Bilinear H model − ERA5</option>
-            <option value="effect">H representation effect — Bilinear minus original</option>
-            <option value="baseline">Model SSTA — Original H, no diffusion</option>
-            <option value="depth">Mixed-layer depth — Bilinear H</option>
-            <option value="depth_original">Mixed-layer depth — Original H</option>
+            <option value="difference">Difference — Model − ERA5</option>
+            <option value="depth">Mixed-layer depth H</option>
           </select>
         </label>
         <p id="description"></p>

@@ -1,6 +1,8 @@
 # Repository cleanup and interactive retention
 
-Local audit: 27 November 2026. The audit included ignored files, not just Git
+Local audit: 27 November 2026. This records the first cleanup; the later
+[historical retirement](historical_retirement.md) explicitly supersedes its
+A/B preservation policy and records further storage recovery. The audit included ignored files, not just Git
 contents. Scientific calculations, inputs, grid, initialisation, parameters and
 historical outputs were not changed. No full historical simulation was rerun.
 Detailed inventories, deletion plans, checksums and browser screenshots are saved

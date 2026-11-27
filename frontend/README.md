@@ -1,138 +1,104 @@
-# Historical SST H-sensitivity viewer
+# SST anomaly modelling viewer
 
-Framework-free TypeScript/Vite/Cesium, independent of the scientific Python
-runtime for historical viewing. An optional local API runs a fixed 24-month
-damping experiment. No database, runtime NetCDF parser, ion token or remote
-imagery is used. WebGL and Node.js 22+ are required.
+Framework-free TypeScript/Vite/Cesium. Historical viewing uses local static
+assets independently of Python; the optional API runs one interactive damping
+experiment at a time. No runtime NetCDF parser, database, ion token or remote
+imagery is required. Use WebGL and Node.js 22+.
 
-## Interactive damping
+## Run and regenerate assets
 
-Start `python -m uvicorn ssta_model.api:app --reload` from the repository root
-after installing `.[api]`, then run `npm run dev` here. Vite forwards `/api` to
-127.0.0.1:8000. Set gamma with the compact slider/numerical input and press
-**Run Simulation**. The exact default is preserved in the numerical input.
-The button is disabled while status is polled. On completion, the 24-state
-interactive result loads automatically using the existing geometry and shared
-historical SST colours. Play/seek to see subsequent months.
-
-All historical/static H selections remain; each sequence keeps its own timeline
-position. The interactive selector retains the latest completed run. Nothing
-overwrites historical assets. See [fixed settings, endpoints and local limits](../docs/interactive_damping.md).
-
-## Run
-
-From the repository root, after both historical model runs exist:
+The primary scientific run is `runs/historical_surface_flux_bilinear_h/`.
+Existing display assets open immediately with:
 
 ```sh
-python experiments/compare_bilinear_h.py --stage export
 cd frontend
 npm ci
 npm run dev
 npm test
 npm run build
-npm run preview
 ```
 
-Export before production builds; Vite copies generated static assets. The
-comparison is the only default experience. Missing/old assets produce an
-explicit error directing you to regenerate them, with no demonstration fallback.
-Synthetic and 24-month demonstration routes, assets and application code were
-retired. Useful generic data, colour and playback tests remain.
+To export when the destination does not yet exist, from the repository root:
 
-## Layers and controls
+```sh
+python experiments/export_historical_viewer.py
+```
 
-The selector contains:
+Only the saved primary model and `data/processed/` are read. No integration, H
+reconstruction or regression fitting occurs. For replacement, use
+`--destination runs/historical_display_next`, validate that export, then move
+the prior `public/data/era5_comparison/` aside and put the validated directory
+there. The exporter refuses existing destinations. Build after installing the
+assets; Vite copies them into `dist/`. `npm run preview` serves that build.
+Remove a regenerable build when no preview server needs it to avoid duplication.
+Unknown/old manifest formats produce an explicit regeneration error.
 
-1. Model SSTA — Bilinear H + diffusion.
-2. Model SSTA — Original H + diffusion.
-3. ERA5 SSTA.
-4. Bilinear H model − ERA5.
-5. H representation effect — Bilinear minus original.
-6. Model SSTA — Original H, no diffusion.
-7. Mixed-layer depth — Bilinear H.
-8. Mixed-layer depth — Original H.
+## Layers and playback
 
-The six time-dependent fields share 574 calendar states (January 1979 observed
-initialization, then February 1979–October 2026 integrations). Switching preserves
-the selected month. Play/pause loops, previous/next and scrubbing pause, speeds
-are 0.5x/1x/2x at a 6-frame/s baseline. Hidden tabs suspend playback. A slower
-browser may skip intermediate frames rather than changing scientific timestamps.
+The four historical selections are **Model SSTA**, **ERA5 SSTA**,
+**Difference — Model − ERA5**, and **Mixed-layer depth H**. Model means the
+current bilinear-H, diffusion-enabled historical simulation. All anomaly layers
+share 574 calendar states: January 1979 observed initialisation, then February
+1979–October 2026 integrations, with exact interval-end timestamps. ERA5 remains
+a monthly mean associated by the existing calendar-label convention.
 
-Selecting **either H layer** pauses and disables playback but keeps the month index. Returning
-to an anomaly field restores that month. H is in metres, fixed throughout the
-simulation, and uses a locked sequential colour type; percentile controls remain
-available. Anomalies default to zero-centred diverging colours. All three model fields and
-ERA5 share fixed full-history colour populations; each difference has its own
-fixed symmetric population. Default p2–p98 limits do not change every month.
-SST populations use deterministic rotating samples plus exact extrema, so these
-are approximate display percentiles, not modified scientific values. Static H
-uses every finite display value. Colour clipping never changes tooltip values.
+Switching anomaly layers preserves the month. Play loops; scrubbing/stepping
+pauses. Speeds are 0.5x/1x/2x at a 6-frame/s baseline; hidden tabs suspend playback.
+Static H pauses/disables playback while retaining the historical index. Anomalies
+use zero-centred diverging colours; model and ERA5 share fixed full-history
+sampled populations, while their difference has its own symmetric population.
+H uses a sequential scale in metres. Percentile controls and physical-value
+tooltips remain; clipping changes colours only, and limits do not vary by month.
 
-## Static data contract
+## Compact data boundary
 
-`public/data/era5_comparison/manifest.json` uses `sst-comparison-f32-v3` and stores
-one grid, chronological calendar labels, exact model state timestamps, frame
-paths, fixed populations, provenance and the static-depth path. Each monthly
-file has six layer-major little-endian float32 arrays in the order above.
-`depth.bin` and `depth_original.bin` contain the two static arrays, with shared
-fixed colour limits. NaN decodes to missing, not zero.
-[comparison.ts](src/data/comparison.ts) validates metadata/0.5-degree geometry,
-file sizes and decoded fields, caching at most three monthly buffers plus two H buffers.
-Latest-request tracking prevents stale network responses overwriting a newer
-selection. Failed frame requests pause playback and show an error.
+`public/data/era5_comparison/manifest.json` uses `sst-comparison-f32-v4`:
+one 0.5-degree grid, calendar/timestamp arrays, frame paths, fixed populations,
+provenance and `staticDepth`. Each monthly binary contains **two layer-major
+little-endian float32 arrays: model, ERA5**. `depth.bin` contains static bilinear H.
+[comparison.ts](src/data/comparison.ts) subtracts stored values for Model−ERA5;
+either missing/non-finite operand produces missing, never zero. It validates
+metadata, geometry, calendar and buffer sizes, retaining at most three monthly
+buffers and one static H buffer. Stale requests cannot replace newer selections.
 
-Science stays at native **0.25 degrees**. Display tiles are **0.5 x 0.5 degrees**,
-using saved native areas. The four direct SST fields use exactly the same current
-finite ocean support. Differences are bilinear-H minus ERA5 or original-H diffusion on
-that support. H independently uses finite positive processed depths; geometry
-also includes H-only coastal tiles, whose SST values remain missing. Counts in
-tooltips describe native H-grid cells assigned to a tile, not a claim of identical
-finite contributor counts in every SST frame. Tropical tiles are never invented.
+Native science stays at 0.25°. Model and ERA5 use the same finite native ocean
+support and saved cell-area weights. H independently uses finite positive depths.
+The geometry intentionally preserves the union of original/bilinear processed
+H tiles, including coastal H-only tiles, so retained interactive grids remain
+compatible. Original H is used only for that geometry, never displayed as a layer.
+SST stays missing outside common support; tropical tiles are omitted. Tooltip
+counts describe native H-grid membership, not monthly finite contributors.
+Native centres use half-degree bins with periodic longitude and the existing
+closed southern/polar edge rules. Coastal rectangles approximate ocean support.
 
-Membership uses native centres and half-open south/north and west/east bins.
-Exact edges go north/east; the southern -20-degree and northern polar edges are
-closed into their domain's last tile. Longitudes wrap to [-180,180), without
-rectangles crossing the antimeridian. Coastal rectangles approximate finite
-ocean coverage and do not trace the exact coastline. Gray means missing; bare
-globe means omitted geometry. Tooltip/legend metadata identify the field, units,
-bounds, aggregate, calendar label or fixed H, and exact state boundary when applicable.
+H is maximum monthly de Boyer Montégut (2023) climatology
+([DOI](https://doi.org/10.17882/91774)), density threshold 0.03 kg/m³ from 10 m.
+Its periodic source-mask-aware bilinear interpolation targets ERA5 ocean;
+original H is retained beyond ±89.5° at baseline active cells. H remains fixed,
+and interpolation adds no observational resolution.
 
-## Architecture and provenance
+## Interactive damping and layout
 
-[data/field.ts](src/data/field.ts) retains generic static and in-memory sequence
-validation. [globe/GridLayer.ts](src/globe/GridLayer.ts) builds geometry once and
-updates colours; [PlaybackController.ts](src/PlaybackController.ts) remains
-DOM/Cesium independent. Controls, picking, legend and tooltip stay modular.
-Cesium assets are copied locally under `/cesium`. Serve at the website root;
-subpath hosting is not configured. The Cesium bundle remains large.
+Start `python -m uvicorn ssta_model.api:app --reload` from the root after
+installing `.[api]`. Vite proxies `/api` to port 8000. Change gamma with the slider
+or precise numerical input, then press **Run Simulation**. The completed
+24-state result becomes an additional selection automatically. Historical and
+interactive timeline positions are remembered separately. Only gamma changes;
+see [fixed settings and five-run retention](../docs/interactive_damping.md).
 
-Both H layers use maximum monthly de Boyer Montégut (2023) climatology,
-[DOI](https://doi.org/10.17882/91774), density threshold 0.03 kg m-3 from 10 m,
-originally 1-degree data. Original H uses containing cells; bilinear H uses
-source-mask-aware periodic interpolation on ERA5 ocean, with original H retained
-beyond ±89.5° at baseline active cells. The model domain is unchanged. Neither
-layer is animated; interpolation adds no observational resolution. The [native H maps](../runs/README.md) are generated
-from processed science independently of display aggregation.
+Interactive v1 outputs remain compatible because the grid ID, bounds, cell order
+and geometry are unchanged; old grid-manifest hashes remain provenance, not an
+identity test. Returned geometry is validated explicitly. An incompatible grid
+is rejected with a reload/regeneration message, never silently remapped.
 
-See [scientific formulation](../docs/surface_flux_model.md),
-[comparison conventions](../docs/era5_comparison.md), and
-[commands](../experiments/README.md). This is retrospective comparison of
-ERA5-related products, not independent forecast validation. No old raw
-atmospheric/MLD files are restored or required by the display workflow.
+Above 900 CSS pixels the globe starts at the panel's right edge (340 px), centred
+in the remaining space. Narrow screens retain the overlaid menu. A resize
+observer updates Cesium without changing the geographic camera target. Picking
+uses canvas coordinates and tooltips add its viewport offset.
 
-## Desktop layout and retained interactive results
-
-Above 900 CSS pixels the globe container starts at the left panel's right edge
-(340 px), centring the globe in the remaining width. At narrower sizes it retains
-the full-width globe and overlaid panel; the existing compact menu applies below
-600 px. A resize observer updates Cesium's canvas with the available space without
-changing the geographical viewpoint. Picking uses canvas coordinates; tooltips
-add the canvas's viewport offset.
-
-The local API automatically retains the five newest completed interactive runs,
-with native outputs and display assets. Older runs return HTTP 410. Existing
-historical comparison and static H assets are protected. See
-[retention details](../docs/interactive_damping.md) and the
-[storage cleanup audit](../docs/repository_cleanup.md). Production `dist/` is a
-regenerable copy of public assets: build before using preview, and remove it when
-no preview server needs it to avoid storing a second full comparison export.
+Generic [field validation](src/data/field.ts), [globe rendering](src/globe/),
+[playback](src/PlaybackController.ts) and [UI controls](src/ui/) remain modular.
+Cesium assets are bundled under `/cesium`; serve at the website root. The bundle
+remains large. See [architecture](../docs/architecture.md),
+[historical retirement and storage](../docs/historical_retirement.md) and
+[scientific comparison conventions](../docs/era5_comparison.md).

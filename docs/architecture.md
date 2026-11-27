@@ -78,32 +78,39 @@ path preserves the original numerical update exactly.
 
 ## Static visualization boundary
 
-[data/diffusion_export.py](../src/ssta_model/data/diffusion_export.py) reads saved
-with/without-diffusion SST, ERA5 anomalies and processed H. It never integrates
-physics or accesses deleted raw atmospheric/MLD files. It writes one 0.5-degree
-grid, six SST arrays per monthly file and two separate static H arrays in the
-current H-sensitivity export, with
-source identities and aggregation checks. All three SST versions share finite
-native support and areas; H independently uses finite processed depths.
+[data/historical_export.py](../src/ssta_model/data/historical_export.py) reads only
+saved primary bilinear-H model SST and processed ERA5/H inputs. It never integrates
+physics, prepares inputs or opens retired original-H historical outputs. Shared
+[comparison aggregation](../src/ssta_model/data/comparison_export.py) supplies the
+existing native ocean-area weighting. One unchanged 0.5° grid, two float32 arrays
+per monthly file (model, ERA5) and one static bilinear H array form the v4 contract.
+The geometry preserves original/bilinear processed-H tile membership for compatibility;
+original H is retained as an input, not a selectable display layer.
 
-[frontend](../frontend/) validates these static assets and retains at most three
-monthly buffers plus H, independently of Python. Geometry and picking are reused;
-layer/month changes update colours. Both H layers share sequential limits;
-SST layers share fixed colour limits where
-compared, differences have their own symmetric scales, and H uses a sequential
-scale in metres. Static H pauses/disables playback and preserves the month for
-returning to SST. No runtime NetCDF parser, backend communication or framework
-is required for historical viewing. The optional local damping control uses the
-API only for explicit runs, polling status and fetching completed static results.
-It reuses the same geometry and controls. Obsolete demonstration routes remain removed.
+[frontend](../frontend/) validates those assets and caches at most three monthly
+buffers plus static H. Model−ERA5 is subtraction of the two stored operands, with
+missing support preserved. Model/ERA5 share fixed SST colour populations; the
+difference has its own fixed symmetric population. Static H uses sequential
+metre limits and disables playback while preserving the month. Geometry, picking,
+timeline and controls are reused. Historical viewing needs no Python runtime.
+The optional damping API runs only on explicit submission, polls status and
+loads completed static results on that same geometry. Interactive v1 results with
+matching geometry remain compatible across the historical v3-to-v4 change;
+geometry mismatches are rejected explicitly. No scientific-resolution change occurs.
+
+Archived multi-experiment exporters/analysis remain reproducible but write only
+to ignored archive locations, never the active viewer. Their original native
+runs must first be reproduced to use them; see [retirement](historical_retirement.md).
 
 ## Reproducibility and storage
 
 Track definitions, source, tests and documentation. Scientific inputs live under
 ignored `data/`; generated outputs, audits and figures under ignored `runs/`.
-Preserve the full no-diffusion baseline and write diffusion to a separate run.
-Only specifically verified obsolete demonstration products are removed; a local
-retirement audit records their identities and sizes.
+Preserve the entire primary bilinear-H historical run. Retired original-H native
+outputs have local archived metadata/metrics/figures and tracked configurations;
+the active display/export/API do not require them. Specific verified removals,
+source hashes and sizes are recorded in local retirement audits. Interactive
+retention remains confined to its five most recent completed runs.
 
 Runs retain resolved configuration, original input/preprocessing hashes,
 initialization identity, code revision/dirty state/source hashes, software

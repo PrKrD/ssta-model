@@ -29,7 +29,7 @@ that proxy, after `npm run build`. This is local execution; nothing is deployed.
 
 Existing processed scientific inputs and the current historical comparison
 manifest/assets are required. They are local, Git-ignored products, not bundled
-observations. Use the existing [historical export](h_sensitivity.md) if assets
+observations. Use the existing [historical export](../frontend/README.md) if assets
 need generating from saved runs. The API reports missing files rather than
 restoring raw data, rebuilding H or running the full historical experiment.
 
@@ -117,7 +117,7 @@ Cesium geometry, picking, tooltip, colour and playback components are reused.
 Interactive SSTA shares the historical fixed SSTA colour population so changing
 gamma does not silently rescale colours. There is no monthly auto-rescaling.
 
-The original historical comparison and both static H layers remain available.
+The primary historical model, ERA5, Model−ERA5 and static bilinear H remain available.
 Historical and interactive timeline positions are remembered separately; static
 H still pauses playback and preserves the historical month. Only the latest
 interactive result appears in the selector, while up to five completed runs remain on disk.
@@ -141,3 +141,11 @@ are written under ignored `runs/`; they do not replace scientific inputs.
 
 See the [storage audit and cleanup](repository_cleanup.md) for measured local
 sizes, preserved scientific products and manual-review candidates.
+
+The historical manifest now uses `sst-comparison-f32-v4` (two monthly arrays).
+The interactive exporter uses only its grid, never retired historical outputs.
+Previously retained `sst-interactive-f32-v1` results remain usable: the geometry,
+cell order and grid ID are unchanged. The frontend validates them explicitly;
+an older recorded grid-manifest hash identifies provenance and is not silently
+substituted or treated as a geometry mismatch. Incompatible returned geometry
+still raises a clear regeneration/reload error. See [retirement](historical_retirement.md).

@@ -24,19 +24,19 @@ async function bootstrap(): Promise<() => void> {
   const comparison = await loadComparison();
   const grid = comparison.manifest.grid;
   let interactive: InteractiveData | null = null;
-  let selected: ComparisonLayer | "interactive" = "bilinear";
+  let selected: ComparisonLayer | "interactive" = "model";
   const times = () => selected === "interactive" ? interactive!.manifest.timestamps : comparison.manifest.timestamps;
   const labels = () => selected === "interactive" ? interactive!.manifest.frameLabels : comparison.manifest.frameLabels;
   const isStatic = () => selected !== "interactive" && isDepthLayer(selected);
   const getFrame = (i: number) => selected === "interactive" ? interactive!.frame(i) : comparison.frame(i, selected);
   // Retain the historical SSTA limits so damping runs remain visually comparable.
-  const population = () => comparison.population(selected === "interactive" ? "bilinear" : selected);
+  const population = () => comparison.population(selected === "interactive" ? "model" : selected);
   let field = await getFrame(0);
   let index = 0;
   element("description").textContent = field.description;
-  element("badge").textContent = "CONTROLLED H SENSITIVITY · 0.5°";
+  element("badge").textContent = "SST ANOMALY MODEL · 0.5°";
   element("dataset-name").textContent = field.name;
-  document.title = "SSTA Model · H sensitivity";
+  document.title = "SSTA Model · SST anomalies";
   const viewer = createViewer("globe");
   const layer = new GridLayer(viewer, grid, field, population());
   const tooltip = new Tooltip(element("tooltip"));
@@ -73,8 +73,8 @@ async function bootstrap(): Promise<() => void> {
       if (changedLayer) layer.setPopulation(population());
       layer.setField(field);
       element("dataset-name").textContent = field.name;
-      element("badge").textContent = selected === "interactive" ? "INTERACTIVE DAMPING · 0.5°" : "CONTROLLED H SENSITIVITY · 0.5°";
-      document.title = selected === "interactive" ? "SSTA Model · Interactive damping" : "SSTA Model · H sensitivity";
+      element("badge").textContent = selected === "interactive" ? "INTERACTIVE DAMPING · 0.5°" : "SST ANOMALY MODEL · 0.5°";
+      document.title = selected === "interactive" ? "SSTA Model · Interactive damping" : "SSTA Model · SST anomalies";
       if (changedLayer) controls.setType(field.colorScale, isStatic());
       else legend.show(field, layer.getColorScale());
       element("description").textContent = field.description;
@@ -164,5 +164,5 @@ bootstrap().then((dispose) => {
   });
 }).catch((error) => {
   console.error(error);
-  element("status").textContent = `Unable to load the historical comparison: ${String(error)}. Generate assets with python experiments/compare_bilinear_h.py --stage export.`;
+  element("status").textContent = `Unable to load the historical comparison: ${String(error)}. Generate assets with python experiments/export_historical_viewer.py.`;
 });

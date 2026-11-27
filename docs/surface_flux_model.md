@@ -92,7 +92,7 @@ meridional off-diagonals leave their positive diagonal contributions in place.
 Geometry/L are built once; matrices and preconditioners are cached for each of
 the four calendar-month durations. No global solver framework is introduced.
 
-The [configuration](../configs/historical_surface_flux_with_diffusion.toml)
+The [primary configuration](../configs/historical_surface_flux_bilinear_h.toml)
 sets CG rtol=1e-12, maxiter=500, independently verified relative flux residual
 <=1e-10 and maximum absolute budget residual <=1e-6 W m-2. Every solve must return
 converged status and pass both independent checks; failures abort the run.

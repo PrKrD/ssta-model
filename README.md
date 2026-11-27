@@ -1,80 +1,68 @@
 # SST anomaly model
 
-A research model of a fixed, geographically varying mixed layer, driven by
-historical atmospheric variability. The current experiment adds conservative
-horizontal diffusion to the surface-forcing/damping baseline, then isolates the
-effect of bilinear H against original-H diffusion and ERA5 monthly SST anomalies.
-This is retrospective comparison, not independent
-forecast validation. There is no advection, subduction, salinity, seasonal H or
-stochastic forcing.
+A fixed, geographically varying mixed-layer SST anomaly model driven by
+historical 12-mode atmospheric forcing and raw turbulent heat-flux regressions.
+The primary historical simulation uses ERA5-targeted bilinear H, conservative
+horizontal diffusion (kappa=1000 m²/s), damping gamma=16.072239642825945 W/m²/K,
+and January 1979 ERA5 SSTA initialisation. This is retrospective comparison,
+not independent forecast validation. No advection, subduction, seasonal H or
+stochastic forcing is added.
 
-Science remains at native 0.25-degree resolution. The standalone 0.5-degree Cesium
-viewer selects SST with diffusion, without diffusion, ERA5, their differences,
-and static mixed-layer depth. An optional local Python API now runs a fixed
-24-month experiment from one damping control; see [interactive damping](docs/interactive_damping.md).
-Obsolete synthetic
-and 24-month demonstrations have been retired.
+Science remains at native 0.25° resolution. The 0.5° Cesium application displays
+**Model SSTA**, **ERA5 SSTA**, **Difference — Model − ERA5**, and fixed
+**Mixed-layer depth H**, with monthly playback and physical-value tooltips.
+An optional local API adds 24-month [interactive damping](docs/interactive_damping.md)
+experiments using one gamma control and five-completed-run retention.
 
-A separate [H/mask rebuild comparison](docs/h_rebuild.md) uses the reuploaded MLD
-source and the old mask-aware bilinear method. It produces proposed fields and
-static diagnostics only; the selected H, ERA5 mask and historical runs are unchanged.
-The [final ERA5-targeted H candidate](docs/h_era5_candidate.md) recomputes bilinear
-H on ERA5 ocean with limited polar baseline retention and explicit domain checks.
-The [controlled historical H sensitivity](docs/h_sensitivity.md) adopts that
-existing product through explicit configuration, preserving the original active
-domain and all other parameters. The Cesium default compares all three model
-experiments, ERA5, H effects and both static depths.
+## Start locally
 
-## Development and execution
-
-Use Python 3.11+ and Node.js 22+:
+Use Python 3.11+ and Node.js 22+, with existing ignored scientific/display inputs:
 
 ```sh
 python -m pip install -e ".[dev,api,visualization]"
-python -m pytest
-ruff check .
-ruff format --check .
+python -m uvicorn ssta_model.api:app --reload
 ```
 
-SciPy supplies the sparse SPD solve. Geometry and per-month-duration factors are
-reused; no dense matrices or parallel computing framework are introduced.
-Existing processed scientific inputs are required; do not restore deleted raw
-atmospheric/MLD data or rerun the original preparation pipeline.
-
-After operator tests and a short actual-data check:
+In another terminal:
 
 ```sh
-OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 python experiments/run_historical_surface_flux.py --config configs/historical_surface_flux_bilinear_h.toml
-python experiments/compare_bilinear_h.py --stage analyse
-python experiments/compare_bilinear_h.py --stage export
 cd frontend
 npm ci
 npm run dev
 ```
 
-The runner defaults to [diffusion configuration](configs/historical_surface_flux_with_diffusion.toml)
-and refuses existing output directories. Preserve the full
-[baseline configuration](configs/historical_surface_flux_era5_initialised.toml)
-and its generated run. Scientific output, figures and static assets are ignored
-by Git. Export before `npm run build`; frontend checks use `npm test`.
+Historical viewing works without the API. To generate missing display assets
+from the preserved `runs/historical_surface_flux_bilinear_h/` and processed ERA5/H:
 
-## Scientific conventions
+```sh
+python experiments/export_historical_viewer.py
+```
 
-The equation uses `(1/H) div(kappa H grad(Theta))`, with harmonic face depths,
-spherical geometry, no-flux inactive/domain boundaries, periodic longitude and
-a conservative polar cap. Initial kappa is 1000 m2 s-1 without tuning. Constant
-surface damping and historical forcing are unchanged. January 1979 ERA5 SSTA
-initializes the model; February 1979–October 2026 provides 573 integrations.
-Later observations do not enter dynamics. H is the unchanged maximum monthly
-**de Boyer Montégut (2023)** climatology, density threshold 0.03 kg m-3 from 10 m,
-[DOI](https://doi.org/10.17882/91774), transferred from 1-degree source cells by
-containing-cell mapping or the explicitly selected bilinear variant. It is fixed
-throughout each simulation; neither mapping adds observational resolution.
+The exporter does not integrate the model and refuses an existing destination;
+see [replacement procedure and display contract](frontend/README.md).
 
-See [physics, discretisation and solver verification](docs/surface_flux_model.md),
-[ERA5 climatology/time/comparison definitions](docs/era5_comparison.md),
-[architecture](docs/architecture.md), [experiment commands](experiments/README.md),
-[input provenance](data/README.md), [output conventions](runs/README.md) and
-[viewer usage](frontend/README.md), and
-[storage cleanup/retention](docs/repository_cleanup.md). Numerical heat conservation does not imply
-that the simplified physical model reproduces observed ocean variability.
+## Science and reproducibility
+
+The [primary configuration](configs/historical_surface_flux_bilinear_h.toml) is
+also the historical runner's default. The existing complete primary run is
+preserved; do not overwrite or rerun it merely to view results. Original-H
+no-diffusion/diffusion experiments are retired from local native storage and the
+viewer, with [summaries, figures and reproduction guidance](docs/historical_retirement.md)
+preserved. Their tracked configurations and numerical implementations remain.
+
+The backward-Euler finite-volume solver uses harmonic face depths, spherical
+geometry, periodic longitude, no-flux inactive boundaries and the existing
+conservative polar cap. H remains geographically varying and temporally fixed:
+maximum valid monthly de Boyer Montégut (2023) climatology
+([DOI](https://doi.org/10.17882/91774)), density threshold 0.03 kg/m³ from 10 m.
+Bilinear mapping preserves the authorised ERA5 active domain and limited polar
+containing-cell values; it does not add observational resolution. rho=1025 kg/m³
+and cp=3990 J/kg/K remain fixed. February 1979–October 2026 gives 573 integrated
+states after January initialisation. Later observations do not enter dynamics.
+
+Validate with `python -m pytest`, `ruff check .`, `ruff format --check .`, then
+`npm test` and `npm run build` from `frontend/`. Generated science and display
+assets stay Git-ignored. See [architecture](docs/architecture.md),
+[scientific equations](docs/surface_flux_model.md), [ERA5 conventions](docs/era5_comparison.md),
+[H reconstruction](docs/h_era5_candidate.md), [experiment commands](experiments/README.md),
+[input provenance](data/README.md) and [output/retention guidance](runs/README.md).

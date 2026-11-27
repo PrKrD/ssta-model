@@ -2,24 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadModule } from "./load-module.mjs";
 
-const { ComparisonData, loadComparison, validateComparison } = await loadModule("../src/data/comparison.ts");
+const { ComparisonData, loadComparison, validateComparison, layerNames, isDepthLayer } = await loadModule("../src/data/comparison.ts");
 const { resolveScale, defaultRange } = await loadModule("../src/globe/ColorScale.ts");
 const { PlaybackController } = await loadModule("../src/PlaybackController.ts");
 
 function manifest() {
-  return { format:"sst-comparison-f32-v3",grid:{id:"comparison",cells:[
+  return { format:"sst-comparison-f32-v4",grid:{id:"comparison",cells:[
     {id:"south",west:-180,east:-179.5,south:-20.5,north:-20,nativeCellCount:4},
     {id:"north",west:179.5,east:180,south:20,north:20.5,nativeCellCount:2},
   ]},months:Array.from({length:574},(_,i)=>new Date(Date.UTC(1979,i,1)).toISOString().slice(0,7)),
     timestamps:Array.from({length:574},(_,i)=>new Date(Date.UTC(1979,i+1,1)).toISOString()),
     frameLabels:Array.from({length:574},(_,i)=>`Calendar month ${i}`),
     frames:Array.from({length:574},(_,i)=>({file:`frames/${String(i).padStart(4,"0")}.bin`})),
-    staticDepth:{file:"depth.bin"},staticOriginalDepth:{file:"depth_original.bin"},originalDepthDescription:"Original fixed H",depthDescription:"Fixed H throughout the simulation",populations:{sst:[-3,-1,0,1,3],difference:[-2,-.5,0,.5,2],effect:[-.2,-.1,0,.1,.2],depth:[50,500]},description:"0.5° common ocean aggregates"};
+    staticDepth:{file:"depth.bin"},depthDescription:"Fixed H throughout the simulation",populations:{sst:[-3,-1,0,1,3],difference:[-2,-.5,0,.5,2],depth:[50,500]},description:"0.5° common ocean aggregates"};
 }
 
 function binary() {
-  const buffer=new ArrayBuffer(48),view=new DataView(buffer);
-  [1,NaN,2,NaN,3,NaN,-2,NaN,-1,NaN,4,NaN].forEach((v,i)=>view.setFloat32(i*4,v,true));
+  const buffer=new ArrayBuffer(16),view=new DataView(buffer);
+  [1,NaN,3,NaN].forEach((v,i)=>view.setFloat32(i*4,v,true));
   return buffer;
 }
 
@@ -39,26 +39,26 @@ test("switching layers preserves selected month, shares SST limits and keeps mis
   const data=new ComparisonData(validateComparison(manifest()),async()=>{requests++;return new Response(binary());});
   const playback=new PlaybackController(574,()=>{});playback.seek(16);
   const index=playback.getState().index;
-  const model=await data.frame(index,"bilinear"),era=await data.frame(index,"era5"),diff=await data.frame(index,"difference");
+  const model=await data.frame(index,"model"),era=await data.frame(index,"era5"),diff=await data.frame(index,"difference");
   assert.equal(playback.getState().index,16);
   assert.equal(model.timeLabel,era.timeLabel);assert.equal(era.timestamp,diff.timestamp);
   assert.deepEqual(model.values,[1,null]);assert.deepEqual(era.values,[3,null]);assert.deepEqual(diff.values,[-2,null]);
   assert.equal(requests,1,"all monthly layers use the same cached monthly buffer");
-  assert.strictEqual(data.population("with_diffusion"),data.population("era5"));
-  const scale=resolveScale("diverging",data.population("with_diffusion"),defaultRange());
+  assert.strictEqual(data.population("model"),data.population("era5"));
+  const scale=resolveScale("diverging",data.population("model"),defaultRange());
   assert.deepEqual(resolveScale("diverging",data.population("era5"),defaultRange()),scale);
   assert.notDeepEqual(resolveScale("diverging",data.population("difference"),defaultRange()),scale);
   playback.step(1);await data.frame(playback.getState().index,"era5");
-  assert.deepEqual(resolveScale("diverging",data.population("with_diffusion"),defaultRange()),scale);
+  assert.deepEqual(resolveScale("diverging",data.population("model"),defaultRange()),scale);
   playback.destroy();
 });
 
 test("monthly buffers are bounded and malformed binary files fail clearly",async()=>{
   const data=new ComparisonData(validateComparison(manifest()),async()=>new Response(binary()));
-  for(let i=0;i<5;i++)await data.frame(i,"with_diffusion");
+  for(let i=0;i<5;i++)await data.frame(i,"model");
   assert.equal(data.cache.size,3);
   const bad=new ComparisonData(validateComparison(manifest()),async()=>new Response(new ArrayBuffer(4)));
-  await assert.rejects(()=>bad.frame(0,"with_diffusion"),/size mismatch/);
+  await assert.rejects(()=>bad.frame(0,"model"),/size mismatch/);
 });
 
 test("injected fetch is called without a class-instance receiver",async()=>{
@@ -66,7 +66,7 @@ test("injected fetch is called without a class-instance receiver",async()=>{
     assert.equal(this,undefined);
     return Promise.resolve(new Response(binary()));
   });
-  await data.frame(0,"with_diffusion");
+  await data.frame(0,"model");
 });
 
 test("fixed H is sequential, in metres and independent of the selected month",async()=>{
@@ -78,32 +78,33 @@ test("fixed H is sequential, in metres and independent of the selected month",as
   const h=await data.frame(playback.getState().index,"depth");
   assert.equal(h.units,"m");assert.equal(h.colorScale,"sequential");assert.equal(h.timestamp,undefined);
   assert.deepEqual(h.values,[50,500]);assert.match(h.timeLabel,/Fixed throughout/);
-  assert.strictEqual(data.population("with_diffusion"),data.population("baseline"));
-  assert.notDeepEqual(data.population("effect"),data.population("difference"));
+  assert.strictEqual(data.population("model"),data.population("model"));
   assert.deepEqual((await data.frame(300,"depth")).values,h.values);assert.equal(requests,1);
   await data.frame(playback.getState().index,"depth");assert.equal(playback.getState().index,37);
   playback.destroy();
 });
 
-test("all H-sensitivity layers decode correctly and both static depths share fixed colour limits",async()=>{
-  const requests=[];
-  const data=new ComparisonData(validateComparison(manifest()),async url=>{
-    requests.push(String(url));
-    if(String(url).endsWith(".bin")&&!String(url).includes("frames/")){
-      const buffer=new ArrayBuffer(8),v=new DataView(buffer),original=String(url).includes("original");
-      v.setFloat32(0,original?100:50,true);v.setFloat32(4,500,true);return new Response(buffer);
-    }
-    return new Response(binary());
+test("only the primary model, ERA5, calculated difference and static H are selectable",async()=>{
+  assert.deepEqual(Object.keys(layerNames),["model","era5","difference","depth"]);
+  assert.equal(layerNames.model,"Model SSTA");assert.equal(isDepthLayer("depth"),true);
+  assert.equal(isDepthLayer("model"),false);
+  const old=manifest();old.format="sst-comparison-f32-v3";
+  assert.throws(()=>validateComparison(old),/regenerate/);
+  const data=new ComparisonData(validateComparison(manifest()),async()=>new Response(binary()));
+  await assert.rejects(()=>data.frame(0,"baseline"),/Unknown comparison layer/);
+});
+
+test("difference subtracts stored floats directly and preserves asymmetric missing operands",async()=>{
+  const m=manifest();m.grid.cells.push({id:"missing",west:0,east:.5,south:20,north:20.5});
+  const data=new ComparisonData(validateComparison(m),async()=>{
+    const buffer=new ArrayBuffer(24),view=new DataView(buffer);
+    [.1,NaN,2,.3,5,Infinity].forEach((v,i)=>view.setFloat32(i*4,v,true));
+    return new Response(buffer);
   });
-  for (const [layer,value] of [["bilinear",1],["with_diffusion",2],["era5",3],["difference",-2],["effect",-1],["baseline",4]]) {
-    const field=await data.frame(16,layer);assert.deepEqual(field.values,[value,null]);
-    assert.equal(field.timestamp,data.manifest.timestamps[16]);
-  }
-  const smooth=await data.frame(16,"depth"),original=await data.frame(16,"depth_original");
-  assert.deepEqual(smooth.values,[50,500]);assert.deepEqual(original.values,[100,500]);
-  assert.equal(original.colorScale,"sequential");assert.equal(original.units,"m");assert.equal(original.timestamp,undefined);
-  assert.strictEqual(data.population("depth"),data.population("depth_original"));
-  assert.strictEqual(data.population("bilinear"),data.population("baseline"));
-  await data.frame(400,"depth_original");await data.frame(400,"depth");
-  assert.equal(requests.length,3);
+  const model=await data.frame(1,"model"),era=await data.frame(1,"era5"),diff=await data.frame(1,"difference");
+  assert.equal(diff.values[0],model.values[0]-era.values[0]);
+  assert.deepEqual(diff.values.slice(1),[null,null]);
+  assert.deepEqual(model.values.slice(1),[null,null]);
+  assert.deepEqual(era.values.slice(1),[null,null]);
+  assert.ok(diff.values[0]<0);
 });

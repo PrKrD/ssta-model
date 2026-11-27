@@ -1,4 +1,11 @@
-# Controlled historical H-representation sensitivity
+# Archived historical H-representation sensitivity
+
+The original-H A/B native outputs have been retired after completed analysis.
+Their summaries/figures/configurations are archived; the complete C run is the
+primary model and remains intact. Active viewing uses only C/ERA5/H via
+`python experiments/export_historical_viewer.py`. See
+[retirement and recorded results](historical_retirement.md). The descriptions
+below document the historical controlled experiment and its reproduction.
 
 This experiment changes **only the representation of fixed H** relative to the
 original-H diffusion run. It does not recalibrate parameters or add physics.
@@ -70,7 +77,8 @@ npm run dev
 ```
 
 These analysis/export commands read saved outputs; they do not run integration
-or alter A/B. Scientific outputs and diagnostics live under
+or alter A/B. They require all three saved runs, so first reproduce the retired
+A/B configurations if repeating the archived comparison. For a fresh reproduction, scientific outputs and diagnostics live under
 `runs/historical_surface_flux_bilinear_h/`. Native comparison figures, monthly
 metrics, regional series, `h_sensitivity_summary.json` and the execution report
 are in its `comparison/` directory.
@@ -108,12 +116,13 @@ These are small sensitivity responses, not evidence of improved physical skill.
 Exact absolute/relative metrics, extrema, source hashes and execution checks are
 in the generated comparison summary/report, outside version control.
 
-## Browser boundary
+## Archived browser comparison
 
-The v3 static export retains one 0.5° grid/timeline, six monthly arrays (C, B,
-ERA5, C−ERA5, C−B, A), and separate bilinear/original static H arrays. All direct
-SSTA fields share fixed sampled limits across time; differences have their own
-fixed symmetric limits; both H layers share one sequential colour population.
-Static H disables playback without losing the selected month. Geometry/picking
-are reused, and no frontend framework, API or scientific-resolution change is
-introduced. See [viewer contract](../frontend/README.md).
+The former v3 viewer contained six monthly arrays and two H layers. Its generated
+assets are retired after validating every current-model/ERA5 value against the
+compact v4 export. Only the four current selections and interactive damping are
+active; see [viewer contract](../frontend/README.md). The original A/B/C scientific
+analysis and its figures remain in the archive/current C comparison directory.
+Archived `compare_bilinear_h.py --stage export` writes under
+`runs/archived_historical_sensitivity/`, after reproducing A/B; it never supplies
+the active viewer. The original full scientific source/configurations are retained.

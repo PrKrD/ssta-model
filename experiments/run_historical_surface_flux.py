@@ -12,7 +12,7 @@ def main():
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/historical_surface_flux_with_diffusion.toml"),
+        default=Path("configs/historical_surface_flux_bilinear_h.toml"),
     )
     parser.add_argument(
         "--root",

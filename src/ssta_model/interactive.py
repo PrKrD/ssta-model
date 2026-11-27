@@ -95,12 +95,16 @@ def export_interactive(run_dir, grid_manifest, destination, gamma):
     import numpy as np
     import xarray as xr
 
-    from ssta_model.data.comparison_export import comparison_bins
-    from ssta_model.data.diffusion_export import aggregate_fields
+    from ssta_model.data.comparison_export import aggregate_fields, comparison_bins
     from ssta_model.data.model_inputs import require
     from ssta_model.data.prepare import checksum
 
-    grid = json.loads(grid_manifest.read_text())["grid"]
+    historical = json.loads(grid_manifest.read_text())
+    require(
+        historical.get("format") == "sst-comparison-f32-v4",
+        "Historical display format changed; regenerate with experiments/export_historical_viewer.py",
+    )
+    grid = historical["grid"]
     cells = grid["cells"]
     keys = np.array([int(cell["id"].removeprefix("comparison-")) for cell in cells])
     require(

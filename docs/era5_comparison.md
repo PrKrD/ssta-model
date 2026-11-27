@@ -114,23 +114,20 @@ Monthly diffusion-minus-baseline statistics isolate the process effect, includin
 changes in spatial variance. Improvements or degradations are reported without
 retuning parameters.
 
-[data/diffusion_export.py](../src/ssta_model/data/diffusion_export.py) produces
-five monthly SST fields (with diffusion, without, ERA5, with-minus-ERA5,
-with-minus-without) and a separate static H array. All three SST datasets use
-common finite native ocean support and area weights. H uses finite positive
-processed depths independently, so H-only coastal tiles have missing SST.
-One fixed 0.5-degree geometry and monthly static files keep browser memory
-bounded; the numerical grid is unchanged at 0.25 degrees. Centre bins use
-half-open north/east edges, periodic longitude, and closed southern -20-degree
-and polar endpoints. Coastal rectangles remain an approximation.
+[data/historical_export.py](../src/ssta_model/data/historical_export.py) exports
+only the current saved bilinear-H diffusion model and ERA5 as two monthly arrays,
+plus static bilinear H. The browser derives Model−ERA5 from the stored operands,
+leaving missing operands missing. All anomaly fields use common finite native
+ocean support and area weights. H uses positive finite processed depths
+independently. The existing 0.5° geometry, calendar association and native 0.25°
+science remain unchanged. Model/ERA5 share fixed sampled colour limits; the
+difference has its own symmetric limits and H uses a sequential metre scale.
 
-All directly comparable SST layers share one fixed sampled colour population.
-The two differences have separate symmetric populations. H uses every finite
-display value, a sequential palette in metres, and pauses playback without losing
-the selected month. Numerical values are never clipped or fitted to improve
-appearance. Demonstration routes and completed 24-month outputs have been
-retired. See [viewer usage](../frontend/README.md) and
-[execution](../experiments/README.md).
+The original-H reference comparison described earlier is now an archived
+experiment. Its configuration, metrics, figures and numerical implementation
+remain reproducible, but its full native outputs are retired from local storage.
+See [retirement](historical_retirement.md), [viewer usage](../frontend/README.md)
+and [execution](../experiments/README.md).
 
 ## Interpretation limits
 

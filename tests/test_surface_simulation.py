@@ -658,7 +658,12 @@ def test_interactive_worker_uses_selected_gamma_and_exports_24_states(experiment
     grid_path = root / "frontend/public/data/era5_comparison"
     grid_path.mkdir(parents=True)
     (grid_path / "manifest.json").write_text(
-        json.dumps({"grid": {"id": "controlled-grid", "cells": cells}})
+        json.dumps(
+            {
+                "format": "sst-comparison-f32-v4",
+                "grid": {"id": "controlled-grid", "cells": cells},
+            }
+        )
     )
     folders = []
     for gamma in (10.0, 20.0):
